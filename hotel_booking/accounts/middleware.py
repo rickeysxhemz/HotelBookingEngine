@@ -4,17 +4,16 @@ JWT Token Blacklist Middleware
 This middleware checks if JWT tokens are blacklisted and rejects requests
 with blacklisted tokens automatically.
 """
-# Standard library imports
-import json
-
 # Django imports
 from django.utils.deprecation import MiddlewareMixin
 from django.http import JsonResponse
-from django.db import connection
 
 # Third-party imports
 from rest_framework_simplejwt.tokens import UntypedToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+
+# Local imports
+from .models import BlacklistedToken
 
 
 class TokenBlacklistMiddleware(MiddlewareMixin):
@@ -38,11 +37,10 @@ class TokenBlacklistMiddleware(MiddlewareMixin):
             token = UntypedToken(auth_header.split(' ')[1])
             jti = str(token['jti'])
             
-            with connection.cursor() as cursor:
-                cursor.execute('SELECT 1 FROM simple_token_blacklist WHERE jti = ?', [jti])
-                if cursor.fetchone():
-                    return JsonResponse({'error': 'Token has been blacklisted', 'code': 'token_blacklisted'}, 
-                                      status=401)
+            # Check if token is blacklisted using the model
+            if BlacklistedToken.is_blacklisted(jti):
+                return JsonResponse({'error': 'Token has been blacklisted', 'code': 'token_blacklisted'}, 
+                                  status=401)
                     
         except (InvalidToken, TokenError, Exception):
             # Invalid token, let DRF handle it

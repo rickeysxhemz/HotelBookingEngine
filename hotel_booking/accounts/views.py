@@ -23,6 +23,7 @@ from .serializers import (
     UserSerializer, UserRegistrationSerializer, LoginSerializer,
     PasswordChangeSerializer, UserUpdateSerializer, UserProfileSerializer
 )
+from .services import TokenBlacklistService
 
 
 class RegisterAPIView(generics.CreateAPIView):
@@ -110,43 +111,30 @@ def logout_api_view(request):
         return Response({'error': 'Refresh token is required for logout'}, 
                        status=status.HTTP_400_BAD_REQUEST)
     
+    # Get access token from Authorization header
+    access_token = None
+    auth_header = request.META.get('HTTP_AUTHORIZATION')
+    if auth_header and auth_header.startswith('Bearer '):
+        access_token = auth_header.split(' ')[1]
+    
     try:
-        # Parse tokens to get JTIs
-        refresh_token_obj = RefreshToken(refresh_token)
-        refresh_jti = str(refresh_token_obj['jti'])
+        # Use the service to blacklist tokens
+        refresh_blacklisted, access_blacklisted = TokenBlacklistService.blacklist_token_pair(
+            refresh_token_str=refresh_token,
+            access_token_str=access_token,
+            user=request.user,
+            reason='logout'
+        )
         
-        # Get access token JTI from Authorization header
-        access_jti = None
-        auth_header = request.META.get('HTTP_AUTHORIZATION')
-        if auth_header and auth_header.startswith('Bearer '):
-            access_token_str = auth_header.split(' ')[1]
-            try:
-                from rest_framework_simplejwt.tokens import UntypedToken
-                access_token_obj = UntypedToken(access_token_str)
-                access_jti = str(access_token_obj['jti'])
-            except:
-                pass
+        if not refresh_blacklisted:
+            return Response({'error': 'Invalid refresh token'}, 
+                           status=status.HTTP_400_BAD_REQUEST)
         
-        # Blacklist tokens
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS simple_token_blacklist (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    jti VARCHAR(255) UNIQUE NOT NULL,
-                    blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            cursor.execute('INSERT OR IGNORE INTO simple_token_blacklist (jti) VALUES (?)', [refresh_jti])
-            if access_jti:
-                cursor.execute('INSERT OR IGNORE INTO simple_token_blacklist (jti) VALUES (?)', [access_jti])
-        
-        return Response({'message': 'Successfully logged out. Token has been blacklisted.'}, 
+        return Response({'message': 'Successfully logged out. Tokens have been blacklisted.'}, 
                        status=status.HTTP_200_OK)
                 
     except Exception as e:
-        return Response({'error': f'Invalid token: {str(e)}'}, 
+        return Response({'error': f'Logout failed: {str(e)}'}, 
                        status=status.HTTP_400_BAD_REQUEST)
 
 

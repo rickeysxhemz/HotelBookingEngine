@@ -9,7 +9,8 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
 # Local imports
-from .models import UserProfile
+from .models import UserProfile, BlacklistedToken
+from .services import TokenBlacklistService
 
 User = get_user_model()
 
@@ -126,11 +127,17 @@ class AccountsAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('blacklisted', response.data['message'].lower())
         
-        # Verify refresh token is blacklisted in our custom table
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute('SELECT 1 FROM simple_token_blacklist WHERE jti = ?', [refresh['jti']])
-            self.assertIsNotNone(cursor.fetchone(), "Refresh token should be blacklisted")
+        # Verify refresh token is blacklisted using the model
+        refresh_jti = str(refresh['jti'])
+        self.assertTrue(BlacklistedToken.is_blacklisted(refresh_jti), 
+                       "Refresh token should be blacklisted")
+        
+        # Verify the blacklisted token record exists
+        blacklisted_token = BlacklistedToken.objects.filter(jti=refresh_jti).first()
+        self.assertIsNotNone(blacklisted_token, "BlacklistedToken record should exist")
+        self.assertEqual(blacklisted_token.user, self.user)
+        self.assertEqual(blacklisted_token.token_type, 'refresh')
+        self.assertEqual(blacklisted_token.reason, 'logout')
         
         # The middleware should prevent further API access with the same token
         # Note: Due to Django test client behavior, we can't fully test middleware in unit tests
@@ -145,3 +152,61 @@ class AccountsAPITest(APITestCase):
         response = self.client.post(url, {})  # No refresh token
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('required', response.data['error'].lower())
+
+
+class TokenBlacklistServiceTest(TestCase):
+    """Test cases for TokenBlacklistService"""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            username='testuser',
+            password='testpass123'
+        )
+    
+    def test_blacklist_token_pair(self):
+        """Test blacklisting token pair"""
+        refresh = RefreshToken.for_user(self.user)
+        access_token_str = str(refresh.access_token)
+        refresh_token_str = str(refresh)
+        
+        # Blacklist token pair
+        refresh_blacklisted, access_blacklisted = TokenBlacklistService.blacklist_token_pair(
+            refresh_token_str=refresh_token_str,
+            access_token_str=access_token_str,
+            user=self.user
+        )
+        
+        self.assertTrue(refresh_blacklisted)
+        self.assertTrue(access_blacklisted)
+        
+        # Verify tokens are blacklisted
+        self.assertTrue(TokenBlacklistService.is_token_blacklisted(refresh_token_str))
+        self.assertTrue(TokenBlacklistService.is_token_blacklisted(access_token_str))
+    
+    def test_is_token_blacklisted(self):
+        """Test token blacklist checking"""
+        refresh = RefreshToken.for_user(self.user)
+        token_str = str(refresh)
+        
+        # Initially not blacklisted
+        self.assertFalse(TokenBlacklistService.is_token_blacklisted(token_str))
+        
+        # Blacklist the token
+        TokenBlacklistService.blacklist_token_pair(refresh_token_str=token_str, user=self.user)
+        
+        # Now should be blacklisted
+        self.assertTrue(TokenBlacklistService.is_token_blacklisted(token_str))
+    
+    def test_extract_jti_from_token(self):
+        """Test JTI extraction from token"""
+        refresh = RefreshToken.for_user(self.user)
+        token_str = str(refresh)
+        expected_jti = str(refresh['jti'])
+        
+        extracted_jti = TokenBlacklistService.extract_jti_from_token(token_str)
+        self.assertEqual(extracted_jti, expected_jti)
+        
+        # Test invalid token
+        invalid_jti = TokenBlacklistService.extract_jti_from_token('invalid_token')
+        self.assertIsNone(invalid_jti)

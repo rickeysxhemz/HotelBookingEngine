@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 
 # Local imports
-from .models import CustomUser, UserProfile, EmailVerificationToken, PasswordResetToken
+from .models import CustomUser, UserProfile, EmailVerificationToken, PasswordResetToken, BlacklistedToken
 
 
 class UserProfileInline(admin.StackedInline):
@@ -85,6 +85,20 @@ class PasswordResetTokenAdmin(admin.ModelAdmin):
         return obj.is_expired()
     is_expired_display.short_description = 'Expired'
     is_expired_display.boolean = True
+
+
+@admin.register(BlacklistedToken)
+class BlacklistedTokenAdmin(admin.ModelAdmin):
+    """Blacklisted token admin"""
+    list_display = ['jti_display', 'user', 'token_type', 'blacklisted_at', 'reason']
+    list_filter = ['token_type', 'reason', 'blacklisted_at']
+    search_fields = ['jti', 'user__email', 'user__username']
+    readonly_fields = ['jti', 'blacklisted_at']
+    ordering = ['-blacklisted_at']
+
+    def jti_display(self, obj):
+        return f"{obj.jti[:8]}...{obj.jti[-8:]}" if len(obj.jti) > 16 else obj.jti
+    jti_display.short_description = 'JTI'
 
 
 # Customize admin site headers

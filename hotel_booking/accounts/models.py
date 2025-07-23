@@ -37,7 +37,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     GENDER_CHOICES = [
         ('M', 'Male'),
         ('F', 'Female'),
-        ('O', 'Other'),
         ('P', 'Prefer not to say'),
     ]
     
@@ -226,4 +225,47 @@ class PasswordResetToken(models.Model):
     
     def is_expired(self):
         return timezone.now() > self.expires_at
+
+
+class BlacklistedToken(models.Model):
+    """Model to store blacklisted JWT tokens"""
+    jti = models.CharField(max_length=255, unique=True, db_index=True, 
+                          help_text="JWT Token Identifier")
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
+    token_type = models.CharField(max_length=20, choices=[
+        ('access', 'Access Token'),
+        ('refresh', 'Refresh Token'),
+    ], default='refresh')
+    blacklisted_at = models.DateTimeField(auto_now_add=True)
+    reason = models.CharField(max_length=100, default='logout', 
+                             help_text="Reason for blacklisting")
+    
+    class Meta:
+        verbose_name = 'Blacklisted Token'
+        verbose_name_plural = 'Blacklisted Tokens'
+        ordering = ['-blacklisted_at']
+        indexes = [
+            models.Index(fields=['jti']),
+        ]
+    
+    def __str__(self):
+        return f"Blacklisted {self.token_type} token ({self.jti[:8]}...)"
+    
+    @classmethod
+    def is_blacklisted(cls, jti):
+        """Check if a token JTI is blacklisted"""
+        return cls.objects.filter(jti=jti).exists()
+    
+    @classmethod
+    def blacklist_token(cls, jti, user=None, token_type='refresh', reason='logout'):
+        """Blacklist a token by its JTI"""
+        token, created = cls.objects.get_or_create(
+            jti=jti,
+            defaults={
+                'user': user,
+                'token_type': token_type,
+                'reason': reason,
+            }
+        )
+        return token, created
     
