@@ -1,9 +1,7 @@
 # Standard library imports
-import uuid
 from datetime import timedelta
 
 # Django imports
-from django.contrib.auth import authenticate
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
@@ -18,10 +16,10 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 # Local imports
-from .models import CustomUser, UserProfile, EmailVerificationToken, PasswordResetToken
+from .models import CustomUser, EmailVerificationToken, PasswordResetToken
 from .serializers import (
     UserSerializer, UserRegistrationSerializer, LoginSerializer,
-    PasswordChangeSerializer, UserUpdateSerializer, UserProfileSerializer
+    PasswordChangeSerializer, UserUpdateSerializer,
 )
 from .services import TokenBlacklistService
 
@@ -54,25 +52,41 @@ class RegisterAPIView(generics.CreateAPIView):
     
     def send_verification_email(self, user):
         """Send email verification"""
-        token = EmailVerificationToken.objects.create(
-            user=user,
-            expires_at=timezone.now() + timedelta(hours=24)
-        )
-        
-        verification_url = self.request.build_absolute_uri(
-            f'/api/accounts/verify-email/{token.token}/'
-        )
-        
-        subject = 'Verify your email address'
-        message = f'Please click the following link to verify your email: {verification_url}'
-        
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL or 'noreply@hotel.com',
-            [user.email],
-            fail_silently=True,
-        )
+        try:
+            # Check for existing unexpired tokens
+            existing_tokens = EmailVerificationToken.objects.filter(
+                user=user,
+                used=False,
+                expires_at__gt=timezone.now()
+            )
+            if existing_tokens.exists():
+                # Use existing token instead of creating new one
+                token = existing_tokens.first()
+            else:
+                token = EmailVerificationToken.objects.create(
+                    user=user,
+                    expires_at=timezone.now() + timedelta(hours=24)
+                )
+            
+            verification_url = self.request.build_absolute_uri(
+                f'/api/accounts/verify-email/{token.token}/'
+            )
+            
+            subject = 'Verify your email address'
+            message = f'Please click the following link to verify your email: {verification_url}'
+            
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL or 'noreply@hotel.com',
+                [user.email],
+                fail_silently=False,  # Don't fail silently in production
+            )
+        except Exception as e:
+            # Log email sending errors
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send verification email to {user.email}: {e}")
 
 
 @api_view(['POST'])
@@ -84,7 +98,13 @@ def login_api_view(request):
     
     user = serializer.validated_data['user']
     
-    # Update last login IP
+    # Check for account lockout due to failed attempts
+    if user.failed_login_attempts >= 5:
+        return Response({
+            'error': 'Account temporarily locked due to too many failed login attempts. Please try again later or reset your password.'
+        }, status=status.HTTP_423_LOCKED)
+    
+    # Update last login IP and reset failed attempts
     user.last_login_ip = get_client_ip(request)
     user.failed_login_attempts = 0
     user.save(update_fields=['last_login_ip', 'failed_login_attempts'])
@@ -184,6 +204,23 @@ def password_reset_request(request):
     try:
         user = CustomUser.objects.get(email=email)
         
+        # Check for existing unexpired tokens to prevent spam
+        existing_tokens = PasswordResetToken.objects.filter(
+            user=user,
+            used=False,
+            expires_at__gt=timezone.now()
+        )
+        
+        if existing_tokens.exists():
+            # Rate limiting: Don't create new token if one exists within last 5 minutes
+            recent_token = existing_tokens.filter(
+                created_at__gt=timezone.now() - timedelta(minutes=5)
+            ).first()
+            if recent_token:
+                return Response({
+                    'message': 'If the email exists, a password reset link has been sent.'
+                })
+        
         # Create password reset token
         token = PasswordResetToken.objects.create(
             user=user,
@@ -198,13 +235,18 @@ def password_reset_request(request):
         subject = 'Password Reset Request'
         message = f'Please click the following link to reset your password: {reset_url}'
         
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL or 'noreply@hotel.com',
-            [user.email],
-            fail_silently=True,
-        )
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL or 'noreply@hotel.com',
+                [user.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send password reset email: {e}")
         
     except CustomUser.DoesNotExist:
         pass  # Don't reveal whether email exists
@@ -229,18 +271,30 @@ def password_reset_confirm(request, token):
     if not password:
         return Response({'error': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
     
-    if len(password) < 8:
-        return Response({'error': 'Password must be at least 8 characters long'}, status=status.HTTP_400_BAD_REQUEST)
+    # Enhanced password validation
+    from django.contrib.auth.password_validation import validate_password
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    
+    try:
+        validate_password(password, user=reset_token.user)
+    except DjangoValidationError as e:
+        return Response({'error': e.messages}, status=status.HTTP_400_BAD_REQUEST)
     
     with transaction.atomic():
         user = reset_token.user
         user.set_password(password)
         user.failed_login_attempts = 0
-        user.save()
+        user.save(update_fields=['password', 'failed_login_attempts'])
         
         # Mark token as used
         reset_token.used = True
-        reset_token.save()
+        reset_token.save(update_fields=['used'])
+        
+        # Invalidate all existing password reset tokens for this user
+        PasswordResetToken.objects.filter(
+            user=user,
+            used=False
+        ).update(used=True)
     
     return Response({'message': 'Password reset successfully!'})
 

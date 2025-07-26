@@ -13,8 +13,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--days',
             type=int,
-            default=30,
-            help='Remove tokens older than this many days (default: 30)',
+            default=20,
+            help='Remove tokens older than this many days (default: 20)',
         )
         parser.add_argument(
             '--dry-run',

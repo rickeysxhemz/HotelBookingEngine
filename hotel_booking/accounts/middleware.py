@@ -42,8 +42,14 @@ class TokenBlacklistMiddleware(MiddlewareMixin):
                 return JsonResponse({'error': 'Token has been blacklisted', 'code': 'token_blacklisted'}, 
                                   status=401)
                     
-        except (InvalidToken, TokenError, Exception):
+        except (InvalidToken, TokenError):
             # Invalid token, let DRF handle it
             pass
+        except Exception as e:
+            # Log unexpected errors for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Unexpected error in TokenBlacklistMiddleware: {e}")
+            # Let DRF handle authentication errors
         
         return None

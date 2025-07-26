@@ -1,20 +1,26 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from accounts.models import EmailVerificationToken, PasswordResetToken
+from accounts.models import EmailVerificationToken, PasswordResetToken, BlacklistedToken
 from django.utils import timezone
+from datetime import timedelta
 
 User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = 'Clean up expired tokens'
+    help = 'Clean up expired and old tokens'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--days',
             type=int,
-            default=7,
-            help='Delete tokens older than this many days (default: 7)'
+            default=30,
+            help='Delete tokens older than this many days (default: 30)'
+        )
+        parser.add_argument(
+            '--dry-run',
+            action='store_true',
+            help='Show what would be deleted without actually deleting',
         )
 
     def handle(self, *args, **options):

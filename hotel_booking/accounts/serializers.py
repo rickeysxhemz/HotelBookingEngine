@@ -80,12 +80,29 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get('password')
         
         if email and password:
-            user = authenticate(username=email, password=password)
-            if not user:
+            try:
+                user = CustomUser.objects.get(email=email)
+                
+                # Check if account is locked
+                if user.failed_login_attempts >= 5:
+                    raise serializers.ValidationError('Account temporarily locked due to too many failed attempts')
+                
+                # Authenticate user
+                authenticated_user = authenticate(username=email, password=password)
+                if not authenticated_user:
+                    # Increment failed login attempts
+                    user.failed_login_attempts += 1
+                    user.save(update_fields=['failed_login_attempts'])
+                    raise serializers.ValidationError('Invalid credentials')
+                
+                if not authenticated_user.is_active:
+                    raise serializers.ValidationError('User account is disabled')
+                    
+                attrs['user'] = authenticated_user
+                
+            except CustomUser.DoesNotExist:
+                # Don't reveal that email doesn't exist
                 raise serializers.ValidationError('Invalid credentials')
-            if not user.is_active:
-                raise serializers.ValidationError('User account is disabled')
-            attrs['user'] = user
         else:
             raise serializers.ValidationError('Must include email and password')
         

@@ -107,6 +107,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = 'Users'
         db_table = 'accounts_customuser'
         ordering = ['-date_joined']
+        indexes = [
+            models.Index(fields=['email']),
+            models.Index(fields=['username']),
+            models.Index(fields=['is_active', 'is_verified']),
+            models.Index(fields=['user_type']),
+        ]
 
     def __repr__(self):
         return f"<CustomUser {self.email}>"
@@ -200,6 +206,11 @@ class EmailVerificationToken(models.Model):
     class Meta:
         verbose_name = 'Email Verification Token'
         verbose_name_plural = 'Email Verification Tokens'
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['user', 'used']),
+            models.Index(fields=['expires_at']),
+        ]
     
     def __str__(self):
         return f"Verification token for {self.user.email}"
@@ -219,6 +230,11 @@ class PasswordResetToken(models.Model):
     class Meta:
         verbose_name = 'Password Reset Token'
         verbose_name_plural = 'Password Reset Tokens'
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['user', 'used']),
+            models.Index(fields=['expires_at']),
+        ]
     
     def __str__(self):
         return f"Password reset token for {self.user.email}"
