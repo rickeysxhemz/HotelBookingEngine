@@ -1,0 +1,69 @@
+# Hotel Booking Engine - Requirements
+# ==================================
+# This file contains all the dependencies for the Hotel Booking Engine
+# Created automatically from the virtual environment
+
+# Core Django Framework
+Django==5.2.4
+asgiref==3.9.1
+sqlparse==0.5.3
+tzdata==2025.2
+setuptools==80.9.0
+
+# Django REST Framework for API
+djangorestframework==3.15.2
+
+# JWT Authentication
+djangorestframework-simplejwt==5.3.0
+PyJWT==2.8.0
+
+# API Documentation
+drf-yasg==1.21.7
+drf-spectacular==0.27.0
+swagger-spec-validator==3.0.3
+PyYAML==6.0.2
+uritemplate==4.2.0
+inflection==0.5.1
+packaging==25.0
+jsonschema==4.25.0
+jsonschema-specifications==2025.4.1
+attrs==25.3.0
+referencing==0.36.2
+rpds-py==0.26.0
+
+# CORS Headers (for frontend integration)
+django-cors-headers==4.3.1
+
+# Environment Variables Management
+python-decouple==3.8
+
+# Phone Number Validation
+django-phonenumber-field==7.1.0
+phonenumbers==8.13.25
+
+# Security & Rate Limiting
+django-ratelimit==4.1.0
+
+# Development Tools
+django-extensions==3.2.3
+
+# Testing
+factory-boy==3.3.0
+coverage==7.3.2
+Faker==37.4.2
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2024.1
+six==1.17.0
+typing-extensions==4.14.1
+
+# Production Server
+gunicorn==21.2.0
+whitenoise==6.5.0
+
+# Image Handling
+Pillow==10.0.0
+
+# Production Database Support (uncomment when needed)
+# psycopg2-binary==2.9.7  # PostgreSQL

@@ -1,0 +1,71 @@
+# Hotel Booking Engine - .gitignore
+
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__/
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+migrations/__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Development and debug files
+debug_*.py
+# test_*.py  # Comment out to include our complete_api_test.py
+setup_*.py
+check_*.py
+
+# Virtual environment - Include so friend doesn't need to create
+# venv/
+# env/
+# .env
+# .venv
+
+# Environment variables (sensitive data only)
+.env.local
+.env.production
+
+# Static files (will be generated)
+staticfiles/
+static/collected/
+
+# Media files (user uploads)
+media/uploads/
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# pytest
+.pytest_cache/
+
+# mypy
+.mypy_cache/

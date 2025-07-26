@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hotel-booking-engine"
+version = "1.0.0"
+description = "Professional Django REST API backend for hotel booking management"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Hotel Booking Team", email = "info@hotelbookingengine.com"},
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Framework :: Django :: 5.2",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "Django>=5.2.4",
+    "djangorestframework>=3.15.2",
+    "djangorestframework-simplejwt>=5.5.1",
+    "Pillow>=11.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "django-extensions>=4.1",
+]
+prod = [
+    "gunicorn>=21.2.0",
+    "psycopg2-binary>=2.9.7",
+    "redis>=4.6.0",
+    "celery>=5.3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/Mujadid2001/HotelBookingEngine"
+Documentation = "https://github.com/Mujadid2001/HotelBookingEngine/tree/main/docs"
+Repository = "https://github.com/Mujadid2001/HotelBookingEngine.git"
+Issues = "https://github.com/Mujadid2001/HotelBookingEngine/issues"
