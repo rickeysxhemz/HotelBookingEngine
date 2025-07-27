@@ -1,14 +1,13 @@
 # Hotel Booking Engine - Requirements
 # ==================================
 # This file contains all the dependencies for the Hotel Booking Engine
-# Created automatically from the virtual environment
+# Cleaned and organized for production use
 
 # Core Django Framework
 Django==5.2.4
 asgiref==3.9.1
 sqlparse==0.5.3
 tzdata==2025.2
-setuptools==80.9.0
 
 # Django REST Framework for API
 djangorestframework==3.15.2
@@ -24,12 +23,6 @@ swagger-spec-validator==3.0.3
 PyYAML==6.0.2
 uritemplate==4.2.0
 inflection==0.5.1
-packaging==25.0
-jsonschema==4.25.0
-jsonschema-specifications==2025.4.1
-attrs==25.3.0
-referencing==0.36.2
-rpds-py==0.26.0
 
 # CORS Headers (for frontend integration)
 django-cors-headers==4.3.1
@@ -52,12 +45,6 @@ factory-boy==3.3.0
 coverage==7.3.2
 Faker==37.4.2
 
-# Utilities
-python-dateutil==2.8.2
-pytz==2024.1
-six==1.17.0
-typing-extensions==4.14.1
-
 # Production Server
 gunicorn==21.2.0
 whitenoise==6.5.0
@@ -65,46 +52,27 @@ whitenoise==6.5.0
 # Image Handling
 Pillow==10.0.0
 
-# Production Database Support (uncomment when needed)
-# psycopg2-binary==2.9.7  # PostgreSQL
-asgiref==3.9.1
-attrs==25.3.0
+# HTTP Requests
+requests==2.32.4
 certifi==2025.7.14
 charset-normalizer==3.4.2
-coverage==7.3.2
-Django==5.2.4
-django-cors-headers==4.3.1
-django-extensions==3.2.3
-django-phonenumber-field==7.1.0
-django-ratelimit==4.1.0
-djangorestframework==3.15.2
-djangorestframework-simplejwt==5.3.0
-drf-spectacular==0.27.0
-drf-yasg==1.21.7
-factory-boy==3.3.0
-Faker==37.4.2
-gunicorn==21.2.0
 idna==3.10
-inflection==0.5.1
+urllib3==2.5.0
+
+# Utilities & Dependencies
+python-dateutil==2.8.2
+pytz==2024.1
+six==1.17.0
+typing-extensions==4.14.1
+packaging==25.0
+setuptools==80.9.0
+
+# JSON Schema Validation (for API docs)
 jsonschema==4.25.0
 jsonschema-specifications==2025.4.1
-packaging==25.0
-phonenumbers==8.13.25
-Pillow==10.0.0
-PyJWT==2.8.0
-python-dateutil==2.8.2
-python-decouple==3.8
-pytz==2024.1
-PyYAML==6.0.2
+attrs==25.3.0
 referencing==0.36.2
-requests==2.32.4
 rpds-py==0.26.0
-setuptools==80.9.0
-six==1.17.0
-sqlparse==0.5.3
-swagger-spec-validator==3.0.3
-typing_extensions==4.14.1
-tzdata==2025.2
-uritemplate==4.2.0
-urllib3==2.5.0
-whitenoise==6.5.0
+
+# Production Database Support (uncomment when needed)
+# psycopg2-binary==2.9.7  # PostgreSQL
