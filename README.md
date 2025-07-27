@@ -1,224 +1,584 @@
-# 🏨 Hotel Booking Engine - Complete API Backend
+# How To Run - Hotel Booking Engine API
 
-A comprehensive Django REST API backend for hotel reservation management featuring JWT authentication, intelligent room search, real-time booking, and complete hotel management system.
+## 🚀 Quick Start Guide
 
-## 🌟 Project Highlights
+This document provides step-by-step instructions to run the Hotel Booking Engine API locally and deploy it to production.
 
-- ✅ **100% Test Coverage** - Complete API test suite with 15 test scenarios
-- 🏨 **Production Ready** - Hotel Maar with 18 rooms pre-configured
-- 🔐 **Secure Authentication** - JWT tokens with automatic blacklisting
-- 📱 **RESTful APIs** - Complete booking lifecycle management
-- 📊 **Smart Room Search** - Intelligent room combinations for any group size
-- 🎯 **Real-time Availability** - Live room availability checking
-- 📖 **Complete Documentation** - Comprehensive API documentation included
+---
 
-## 🚀 Quick Start (5 Minutes)
+## 📋 Table of Contents
 
-### 1. Clone & Setup
+- [Prerequisites](#prerequisites)
+- [Local Development Setup](#local-development-setup)
+- [Running the API](#running-the-api)
+- [Testing the API](#testing-the-api)
+- [Admin Access](#admin-access)
+- [Production Deployment](#production-deployment)
+- [Troubleshooting](#troubleshooting)
+- [Additional Resources](#additional-resources)
+
+---
+
+## Prerequisites
+
+### System Requirements
+- **Python**: 3.8 or higher (recommended: 3.12+)
+- **Operating System**: Windows, macOS, or Linux
+- **Memory**: Minimum 2GB RAM
+- **Storage**: At least 500MB free space
+
+### Required Software
+- Python 3.8+ installed and accessible via command line
+- Git (optional, for version control)
+- Code editor (VS Code, PyCharm, etc.)
+
+### Check Your Python Installation
 ```bash
-git clone https://github.com/Mujadid2001/HotelBookingEngine.git
-cd HotelBookingEngine/hotel_booking
+python --version
+# or
+python3 --version
 ```
 
-### 2. Install Dependencies
+---
+
+## Local Development Setup
+
+### Step 1: Navigate to Project Directory
 ```bash
-# Virtual environment already included with all packages
+cd "c:\Users\PMLS\Downloads\My Learning\Hotel booking Engine\HotelBookingEngine"
+```
+
+### Step 2: Create Virtual Environment (Recommended)
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
 # On Windows:
 venv\Scripts\activate
 
 # On macOS/Linux:
 source venv/bin/activate
+```
 
-# If needed, install dependencies:
+### Step 3: Install Dependencies
+```bash
+cd hotel_booking
 pip install -r requirements.txt
 ```
 
-### 3. Start Server
+### Step 4: Database Setup
 ```bash
+# Apply database migrations
+python manage.py migrate
+
+# Set up initial hotel data (Hotel Maar with rooms and services)
+python manage.py setup_initial_data
+
+# Create admin superuser (optional)
+python manage.py createsuperuser
+```
+
+---
+
+## Running the API
+
+### Start the Development Server
+```bash
+# Navigate to project directory
+cd hotel_booking
+
+# Start the Django development server
 python manage.py runserver
 ```
 
-### 4. Test Everything Works
+### Server Information
+- **API Base URL**: `http://127.0.0.1:8000/api/`
+- **Admin Panel**: `http://127.0.0.1:8000/admin/`
+- **API Documentation**: `http://127.0.0.1:8000/api/schema/swagger-ui/`
+- **API Browser**: `http://127.0.0.1:8000/api/`
+
+### Verify Server is Running
+Open your browser and visit: `http://127.0.0.1:8000/api/core/hotels/`
+
+You should see a JSON response with Hotel Maar information.
+
+---
+
+## Testing the API
+
+### Option 1: Automated Test Suite (Recommended)
 ```bash
+# Run comprehensive API test suite
 python complete_api_test.py --check-server
 ```
 
-**Expected Result**: 100% success rate with all 15 tests passing ✅
-
-## 🎯 Access Points
-
-Once running, access these URLs:
-
-- **📋 API Root**: http://127.0.0.1:8000/api/
-- **🏨 Hotel Data**: http://127.0.0.1:8000/api/core/hotels/
-- **👤 Admin Panel**: http://127.0.0.1:8000/admin/
-- **📖 API Docs**: http://127.0.0.1:8000/api/schema/swagger-ui/
-
-### 🔑 Pre-configured Access
-- **Admin Login**: admin@hotelmaar.com / AdminPass123!
-- **Hotel**: Hotel Maar (4-star with 18 rooms)
-- **Room Types**: Single, Double, Family Suite, Deluxe Suite
-- **Services**: Breakfast, Parking, Shuttle, Room Service
-
-## 🏗️ Architecture Overview
-
+**Expected Output:**
 ```
-🏨 Hotel Booking Engine
-├── 👥 User Management (JWT Authentication)
-├── 🏨 Hotel Management (Hotel Maar Setup)
-├── 🛏️  Room Management (4 types, 18 rooms)
-├── 📅 Booking System (Complete lifecycle)
-├── 💰 Pricing Engine (Seasonal pricing)
-├── 🎯 Extra Services (6 services available)
-└── 📊 Admin Dashboard (Full management)
+🏨 HOTEL BOOKING ENGINE - COMPLETE API TEST SUITE
+================================================================================
+Total Tests: 15
+Passed: 15
+Failed: 0
+Errors: 0
+Success Rate: 100.0%
+🎉 EXCELLENT! Hotel Booking Engine API is working great!
 ```
 
-## 🧪 Testing & Validation
-
-### Automated Test Suite
+### Option 2: Manual Testing with curl
 ```bash
-python complete_api_test.py --check-server
-```
-
-**What gets tested:**
-- ✅ User registration and authentication
-- ✅ JWT token management (access + refresh)
-- ✅ Hotel discovery and details
-- ✅ Room search with availability
-- ✅ Complete booking flow
-- ✅ Booking management and history
-- ✅ API security and validation
-
-### Manual Testing
-```bash
-# Test hotel endpoint
-curl -X GET "http://127.0.0.1:8000/api/core/hotels/"
+# Test hotels endpoint
+curl -X GET "http://127.0.0.1:8000/api/core/hotels/" -H "Content-Type: application/json"
 
 # Test user registration
 curl -X POST "http://127.0.0.1:8000/api/accounts/register/" \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","username":"testuser","first_name":"Test","last_name":"User","phone_number":"+1234567890","password":"TestPass123!","password_confirm":"TestPass123!"}'
+  -d '{
+    "email": "test@example.com",
+    "username": "testuser",
+    "first_name": "Test",
+    "last_name": "User",
+    "phone_number": "+1234567890",
+    "password": "TestPass123!",
+    "password_confirm": "TestPass123!"
+  }'
 ```
 
-## 📁 Project Structure
-
-```
-HotelBookingEngine/
-├── 📄 README.md                    # This file
-├── 📋 HowTo_RUN.md                 # Detailed setup guide
-├── 📖 API_DOCUMENTATION.md         # Complete API docs (150+ pages)
-├── 📊 COMPLETION_SUMMARY.md        # Project completion summary
-├── 🏨 hotel_booking/               # Main Django project
-│   ├── 👥 accounts/                # User authentication system
-│   ├── 🏨 core/                    # Hotel & room management
-│   ├── 📅 bookings/                # Booking system
-│   ├── ⚙️  hotel_booking/          # Django settings
-│   ├── 📋 requirements.txt         # All dependencies (36 packages)
-│   ├── 🧪 complete_api_test.py    # Comprehensive test suite
-│   ├── 🗄️  db.sqlite3              # Database with Hotel Maar data
-│   ├── 🚀 manage.py               # Django management
-│   └── 📁 venv/                   # Virtual environment (included!)
-└── 📝 .gitignore                  # Git ignore rules
-```
-
-## 🔧 Tech Stack
-
-- **🐍 Python**: 3.12.4
-- **🌐 Django**: 5.2.4 + REST Framework 3.15.2
-- **🔐 Authentication**: JWT with djangorestframework-simplejwt
-- **🗄️ Database**: SQLite (dev) / PostgreSQL (production)
-- **📖 Documentation**: drf-spectacular (OpenAPI 3.0)
-- **🧪 Testing**: Custom comprehensive test suite
-- **🚀 Deployment**: Production-ready configurations
-
-## 🎯 Key Features
-
-### 🔐 Authentication System
-- JWT token-based authentication
-- Automatic token blacklisting on logout
-- User registration with email verification
-- Secure password validation
-
-### 🏨 Hotel Management
-- **Hotel Maar**: Pre-configured luxury hotel
-- **18 Rooms**: 4 Standard Single, 6 Standard Double, 5 Family Suite, 3 Deluxe Suite
-- **6 Services**: Continental/Full Breakfast, Parking, Shuttle, Room Service, Late Check-out
-- **Seasonal Pricing**: Dynamic pricing based on dates
-
-### 📅 Booking System
-- **Smart Search**: Intelligent room combinations for any group size
-- **Real-time Availability**: Live availability checking
-- **Complete Lifecycle**: Create, view, update, cancel bookings
-- **Booking History**: Complete audit trail of all changes
-- **Extra Services**: Add services like breakfast and parking
-
-### 📊 Admin Features
-- **Django Admin**: Complete administrative interface
-- **User Management**: Manage customer accounts
-- **Booking Management**: View and manage all reservations
-- **Hotel Configuration**: Manage rooms, pricing, and services
-
-## 📖 Documentation
-
-### 📋 For Quick Setup
-- **[HowTo_RUN.md](HowTo_RUN.md)** - Step-by-step setup and deployment guide
-
-### 📖 For API Development
-- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API reference (150+ pages)
-- **Swagger UI**: http://127.0.0.1:8000/api/schema/swagger-ui/
-- **API Browser**: http://127.0.0.1:8000/api/
-
-### 📊 For Project Overview
-- **[COMPLETION_SUMMARY.md](COMPLETION_SUMMARY.md)** - Project completion summary
-
-## 🚀 Production Deployment
-
-### Option 1: Traditional Server (VPS)
-Complete setup with PostgreSQL, Nginx, Gunicorn, and SSL - see [HowTo_RUN.md](HowTo_RUN.md#production-deployment)
-
-### Option 2: Docker
-```bash
-docker-compose up -d
-```
-
-### Option 3: Cloud Platforms
-- Heroku, AWS, Google Cloud, Azure - configurations included
-
-## 🤝 For Your Friend
-
-This repository is **ready to use** with:
-
-✅ **Virtual environment included** - No need to create one  
-✅ **All dependencies installed** - Just activate venv  
-✅ **Database pre-configured** - Hotel Maar ready to go  
-✅ **Admin user created** - admin@hotelmaar.com  
-✅ **Complete test suite** - Verify everything works  
-✅ **Comprehensive docs** - Everything documented  
-
-### 🎯 Your friend should:
-1. Clone this repository
-2. Activate virtual environment
-3. Run `python manage.py runserver`
-4. Run `python complete_api_test.py --check-server`
-5. Start building their frontend!
-
-## 📞 Support
-
-- **📖 Documentation**: See `API_DOCUMENTATION.md` for complete API reference
-- **🚀 Setup Guide**: See `HowTo_RUN.md` for detailed setup instructions
-- **🧪 Testing**: Run `complete_api_test.py` to verify everything works
-- **📊 Summary**: See `COMPLETION_SUMMARY.md` for project overview
-
-## 🏆 Project Status
-
-**Status**: ✅ COMPLETE  
-**API Test Coverage**: 100% (15/15 tests passing)  
-**Documentation**: Complete with examples  
-**Production Ready**: Yes  
-**Last Updated**: July 26, 2025  
+### Option 3: Browser-based Testing
+1. Visit `http://127.0.0.1:8000/api/` for interactive API browser
+2. Visit `http://127.0.0.1:8000/api/schema/swagger-ui/` for Swagger UI
 
 ---
 
-**🎉 Ready to power your hotel booking application!**
+## Admin Access
 
-*Built with ❤️ using Django REST Framework*
+### Pre-configured Admin User
+- **URL**: `http://127.0.0.1:8000/admin/`
+- **Email**: `admin@hotelmaar.com`
+- **Password**: `AdminPass123!`
+
+### Admin Panel Features
+- **User Management**: View and manage user accounts
+- **Hotel Management**: Configure rooms, pricing, and services
+- **Booking Management**: View and manage all bookings
+- **System Monitoring**: Database records and statistics
+
+---
+
+## Production Deployment
+
+### Option 1: Basic VPS Deployment
+
+#### Step 1: Server Setup
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Install Python and required packages
+sudo apt install python3 python3-pip python3-venv nginx postgresql postgresql-contrib -y
+
+# Install Gunicorn for production server
+pip3 install gunicorn
+```
+
+#### Step 2: Database Configuration
+```bash
+# Create PostgreSQL database
+sudo -u postgres psql
+CREATE DATABASE hotel_booking_db;
+CREATE USER hotel_user WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE hotel_booking_db TO hotel_user;
+\q
+```
+
+#### Step 3: Environment Configuration
+Create `.env` file:
+```bash
+DEBUG=False
+SECRET_KEY=your-super-secret-key-here
+DATABASE_URL=postgresql://hotel_user:your_secure_password@localhost:5432/hotel_booking_db
+ALLOWED_HOSTS=your-domain.com,www.your-domain.com,your-server-ip
+CORS_ALLOWED_ORIGINS=https://your-frontend-domain.com
+```
+
+#### Step 4: Application Setup
+```bash
+# Clone/upload your code
+git clone your-repository-url
+cd hotel-booking-engine
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+pip install gunicorn psycopg2-binary
+
+# Run migrations
+python manage.py migrate
+python manage.py setup_initial_data
+python manage.py collectstatic
+
+# Create superuser
+python manage.py createsuperuser
+```
+
+#### Step 5: Gunicorn Configuration
+Create `gunicorn.conf.py`:
+```python
+bind = "127.0.0.1:8000"
+workers = 3
+worker_class = "sync"
+worker_connections = 1000
+max_requests = 1000
+max_requests_jitter = 100
+timeout = 30
+keepalive = 2
+```
+
+#### Step 6: Systemd Service
+Create `/etc/systemd/system/hotel-booking.service`:
+```ini
+[Unit]
+Description=Hotel Booking Engine
+After=network.target
+
+[Service]
+User=your-user
+Group=your-group
+WorkingDirectory=/path/to/your/project
+Environment="PATH=/path/to/your/project/venv/bin"
+ExecStart=/path/to/your/project/venv/bin/gunicorn --config gunicorn.conf.py hotel_booking.wsgi:application
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Step 7: Nginx Configuration
+Create `/etc/nginx/sites-available/hotel-booking`:
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com www.your-domain.com;
+
+    location /static/ {
+        alias /path/to/your/project/staticfiles/;
+    }
+
+    location /media/ {
+        alias /path/to/your/project/media/;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+#### Step 8: SSL Certificate (Let's Encrypt)
+```bash
+# Install Certbot
+sudo apt install certbot python3-certbot-nginx -y
+
+# Get SSL certificate
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+```
+
+#### Step 9: Start Services
+```bash
+# Enable and start services
+sudo systemctl enable hotel-booking
+sudo systemctl start hotel-booking
+sudo systemctl enable nginx
+sudo systemctl restart nginx
+
+# Check status
+sudo systemctl status hotel-booking
+sudo systemctl status nginx
+```
+
+### Option 2: Docker Deployment
+
+#### Create Dockerfile
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "hotel_booking.wsgi:application"]
+```
+
+#### Create docker-compose.yml
+```yaml
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=your-secret-key
+      - DATABASE_URL=postgresql://hotel_user:password@db:5432/hotel_booking_db
+    depends_on:
+      - db
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=hotel_booking_db
+      - POSTGRES_USER=hotel_user
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+```
+
+#### Deploy with Docker
+```bash
+# Build and start containers
+docker-compose up -d
+
+# Run migrations
+docker-compose exec web python manage.py migrate
+docker-compose exec web python manage.py setup_initial_data
+docker-compose exec web python manage.py collectstatic --noinput
+```
+
+### Option 3: Cloud Platform Deployment
+
+#### Heroku Deployment
+1. Install Heroku CLI
+2. Create `Procfile`:
+   ```
+   web: gunicorn hotel_booking.wsgi:application --log-file -
+   release: python manage.py migrate && python manage.py setup_initial_data
+   ```
+3. Configure environment variables in Heroku dashboard
+4. Deploy:
+   ```bash
+   heroku create your-app-name
+   git push heroku main
+   ```
+
+#### AWS/Google Cloud/Azure
+- Use platform-specific guides for Django deployment
+- Configure load balancers, auto-scaling, and managed databases
+- Set up CDN for static files
+- Configure monitoring and logging
+
+---
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. Server Won't Start
+**Problem**: `ModuleNotFoundError` or import errors
+**Solution**:
+```bash
+# Ensure virtual environment is activated
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+
+# Reinstall dependencies
+pip install -r requirements.txt
+```
+
+#### 2. Database Errors
+**Problem**: `django.db.utils.OperationalError`
+**Solution**:
+```bash
+# Reset database
+python manage.py migrate
+python manage.py setup_initial_data
+```
+
+#### 3. Permission Denied
+**Problem**: `PermissionError` on Windows
+**Solution**:
+- Run terminal as Administrator
+- Check file permissions
+- Ensure Python is in PATH
+
+#### 4. Port Already in Use
+**Problem**: `Error: That port is already in use`
+**Solution**:
+```bash
+# Use different port
+python manage.py runserver 8001
+
+# Or kill process using port 8000
+# Windows:
+netstat -ano | findstr :8000
+taskkill /PID <process_id> /F
+
+# Linux/Mac:
+lsof -ti:8000 | xargs kill -9
+```
+
+#### 5. API Tests Failing
+**Problem**: Test suite shows failures
+**Solution**:
+```bash
+# Ensure server is running first
+python manage.py runserver
+
+# In another terminal, run tests
+python complete_api_test.py --check-server
+```
+
+### Getting Help
+
+#### Check Logs
+```bash
+# Django development server logs
+python manage.py runserver --verbosity=2
+
+# Production logs
+sudo journalctl -u hotel-booking -f
+sudo tail -f /var/log/nginx/error.log
+```
+
+#### Validate Configuration
+```bash
+# Check Django configuration
+python manage.py check
+
+# Check database connection
+python manage.py dbshell
+
+# Check static files
+python manage.py collectstatic --dry-run
+```
+
+---
+
+## Additional Resources
+
+### API Documentation
+- **Complete API Docs**: `API_DOCUMENTATION.md`
+- **Project Summary**: `COMPLETION_SUMMARY.md`
+- **Interactive API Browser**: `http://127.0.0.1:8000/api/`
+- **Swagger UI**: `http://127.0.0.1:8000/api/schema/swagger-ui/`
+
+### Useful Commands
+```bash
+# Create superuser
+python manage.py createsuperuser
+
+# Clear database and start fresh
+python manage.py flush
+python manage.py migrate
+python manage.py setup_initial_data
+
+# Generate new secret key
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+# Check installed packages
+pip list
+
+# Export current environment
+pip freeze > requirements.txt
+```
+
+### Project Structure
+```
+HotelBookingEngine/
+├── hotel_booking/              # Main Django project
+│   ├── accounts/              # User authentication
+│   ├── core/                  # Hotel management
+│   ├── bookings/              # Booking system
+│   ├── manage.py              # Django management
+│   ├── requirements.txt       # Dependencies
+│   ├── complete_api_test.py   # Test suite
+│   └── db.sqlite3            # Database file
+├── API_DOCUMENTATION.md       # Complete API docs
+├── HowTo_RUN.md              # This file
+└── COMPLETION_SUMMARY.md     # Project summary
+```
+
+### Environment Variables Reference
+```bash
+# Development
+DEBUG=True
+SECRET_KEY=your-dev-secret-key
+DATABASE_URL=sqlite:///db.sqlite3
+
+# Production
+DEBUG=False
+SECRET_KEY=your-production-secret-key
+DATABASE_URL=postgresql://user:pass@host:5432/dbname
+ALLOWED_HOSTS=your-domain.com,www.your-domain.com
+CORS_ALLOWED_ORIGINS=https://your-frontend.com
+EMAIL_HOST=smtp.your-provider.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=your-email@domain.com
+EMAIL_HOST_PASSWORD=your-email-password
+```
+
+---
+
+## 🎉 Success!
+
+If you've followed this guide successfully, you should now have:
+
+✅ **Hotel Booking Engine API** running locally  
+✅ **Admin panel** accessible for management  
+✅ **Complete test suite** passing with 100% success  
+✅ **Production deployment** (if deployed)  
+✅ **API documentation** available for reference  
+
+### Quick Verification Checklist
+- [ ] Server starts without errors: `python manage.py runserver`
+- [ ] API responds: Visit `http://127.0.0.1:8000/api/core/hotels/`
+- [ ] Tests pass: `python complete_api_test.py --check-server`
+- [ ] Admin accessible: `http://127.0.0.1:8000/admin/`
+- [ ] Documentation loads: `http://127.0.0.1:8000/api/schema/swagger-ui/`
+
+### Need Help?
+- 📖 Read the complete `API_DOCUMENTATION.md`
+- 🧪 Run the test suite to verify functionality
+- 🔍 Check the troubleshooting section above
+- 📧 Contact support (if available)
+
+**Happy Coding! 🚀**
+
+---
+
+**Last Updated**: July 26, 2025  
+**Version**: 1.0  
+**Compatibility**: Python 3.8+, Django 5.2+

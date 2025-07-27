@@ -42,11 +42,11 @@ debug_*.py
 setup_*.py
 check_*.py
 
-# Virtual environment - Include so friend doesn't need to create
-# venv/
-# env/
-# .env
-# .venv
+#Virtual environment - Include so friend doesn't need to create
+venv/
+env/
+.env
+.venv
 
 # Environment variables (sensitive data only)
 .env.local
