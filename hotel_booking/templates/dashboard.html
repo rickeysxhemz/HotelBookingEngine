@@ -1,0 +1,832 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-lg-3">
+        <div class="sidebar">
+            <h5 class="mb-3">
+                <i class="fas fa-tachometer-alt me-2"></i>
+                Dashboard
+            </h5>
+            
+            <!-- API Status -->
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="h6 mb-1">API Status</div>
+                        <span id="apiStatus" class="badge bg-secondary">
+                            <span class="loading-spinner"></span> Checking...
+                        </span>
+                    </div>
+                    <i class="fas fa-server fa-2x opacity-50"></i>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Quick Stats
+                    </h6>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="stats-number text-primary" id="totalRequests">0</div>
+                            <small class="text-muted">Requests</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="stats-number text-success" id="successRate">100%</div>
+                            <small class="text-muted">Success</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="mt-3">
+                <ul class="sidebar-nav">
+                    <li><a href="#auth-section" class="nav-link" onclick="scrollToSection('auth-section')">
+                        <i class="fas fa-lock me-2"></i> Authentication
+                    </a></li>
+                    <li><a href="#hotels-section" class="nav-link" onclick="scrollToSection('hotels-section')">
+                        <i class="fas fa-hotel me-2"></i> Hotels
+                    </a></li>
+                    <li><a href="#bookings-section" class="nav-link" onclick="scrollToSection('bookings-section')">
+                        <i class="fas fa-calendar-check me-2"></i> Bookings
+                    </a></li>
+                    <li><a href="#profile-section" class="nav-link" onclick="scrollToSection('profile-section')">
+                        <i class="fas fa-user me-2"></i> Profile
+                    </a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-lg-9">
+        <div class="main-container">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h1 class="display-4 mb-3">
+                    <i class="fas fa-hotel text-primary me-3"></i>
+                    Hotel Booking API Dashboard
+                </h1>
+                <p class="lead text-muted">
+                    Interactive testing interface for the Hotel Booking Engine API
+                </p>
+            </div>
+
+            <!-- Auth Token Display -->
+            <div id="authTokenDisplay" class="auth-token" style="display: none;">
+                <h6><i class="fas fa-key me-2"></i>Current Auth Token</h6>
+                <code class="auth-token-display">No token set</code>
+                <button class="btn btn-sm btn-outline-danger ms-2" onclick="clearAuthToken()">
+                    <i class="fas fa-times"></i> Clear
+                </button>
+            </div>
+
+            <!-- Authentication Section -->
+            <section id="auth-section" class="mb-5">
+                <div class="card endpoint-card">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="fas fa-lock me-2"></i>
+                            Authentication
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Login -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <span class="method-badge method-post">POST</span>
+                                        <strong>/auth/login/</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="loginForm">
+                                            <div class="mb-3">
+                                                <label class="form-label">Email</label>
+                                                <input type="email" class="form-control" name="email" value="guest@example.com" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Password</label>
+                                                <input type="password" class="form-control" name="password" value="TestPass123!" required>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary w-100">
+                                                <i class="fas fa-sign-in-alt me-2"></i>
+                                                Login
+                                            </button>
+                                        </form>
+                                        <div id="loginResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Register -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-success text-white">
+                                        <span class="method-badge method-post">POST</span>
+                                        <strong>/auth/register/</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="registerForm">
+                                            <div class="mb-3">
+                                                <label class="form-label">Email</label>
+                                                <input type="email" class="form-control" name="email" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Username</label>
+                                                <input type="text" class="form-control" name="username" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Password</label>
+                                                <input type="password" class="form-control" name="password" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Confirm Password</label>
+                                                <input type="password" class="form-control" name="password_confirm" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">First Name</label>
+                                                <input type="text" class="form-control" name="first_name" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Last Name</label>
+                                                <input type="text" class="form-control" name="last_name" required>
+                                            </div>
+                                            <button type="submit" class="btn btn-success w-100">
+                                                <i class="fas fa-user-plus me-2"></i>
+                                                Register
+                                            </button>
+                                        </form>
+                                        <div id="registerResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Hotels Section -->
+            <section id="hotels-section" class="mb-5">
+                <div class="card endpoint-card">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="fas fa-hotel me-2"></i>
+                            Hotels & Rooms
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- List Hotels -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/hotels/</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="text-muted">Get list of all hotels</p>
+                                        <button class="btn btn-info w-100" onclick="listHotels()">
+                                            <i class="fas fa-list me-2"></i>
+                                            Get Hotels
+                                        </button>
+                                        <div id="hotelsResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Hotel Details -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/hotels/{id}/</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Hotel ID</label>
+                                            <input type="text" class="form-control" id="hotelIdInput" placeholder="Hotel UUID">
+                                        </div>
+                                        <button class="btn btn-primary w-100" onclick="getHotelDetails()">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            Get Hotel Details
+                                        </button>
+                                        <div id="hotelDetailsResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <!-- Hotel Rooms -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-warning text-white">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/hotels/{id}/rooms/</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Hotel ID</label>
+                                            <input type="text" class="form-control" id="hotelRoomsIdInput" placeholder="Hotel UUID">
+                                        </div>
+                                        <button class="btn btn-warning w-100" onclick="getHotelRooms()">
+                                            <i class="fas fa-bed me-2"></i>
+                                            Get Hotel Rooms
+                                        </button>
+                                        <div id="hotelRoomsResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Room Availability -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-success text-white">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/hotels/{id}/availability/</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Hotel ID</label>
+                                            <input type="text" class="form-control" id="availabilityHotelIdInput" placeholder="Hotel UUID">
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <label class="form-label">Check-in</label>
+                                                <input type="date" class="form-control" id="checkInDate">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label">Check-out</label>
+                                                <input type="date" class="form-control" id="checkOutDate">
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-success w-100 mt-3" onclick="checkAvailability()">
+                                            <i class="fas fa-calendar-check me-2"></i>
+                                            Check Availability
+                                        </button>
+                                        <div id="availabilityResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <!-- Hotel Search with Dates and Capacity -->
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/hotels/search-availability/</strong>
+                                        <small class="ms-2">🔥 New Feature</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <h6 class="mb-3">
+                                            <i class="fas fa-search me-2"></i>
+                                            Search Hotels with Dates & Capacity
+                                        </h6>
+                                        <p class="text-muted mb-3">
+                                            Find available hotels based on check-in/check-out dates and guest capacity.
+                                        </p>
+                                        <form id="hotelSearchForm">
+                                            <div class="row">
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Check-in Date</label>
+                                                    <input type="date" class="form-control" name="check_in" id="searchCheckIn" required>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Check-out Date</label>
+                                                    <input type="date" class="form-control" name="check_out" id="searchCheckOut" required>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Guests</label>
+                                                    <select class="form-select" name="capacity" id="searchCapacity">
+                                                        <option value="">Any</option>
+                                                        <option value="1">1 Guest</option>
+                                                        <option value="2" selected>2 Guests</option>
+                                                        <option value="3">3 Guests</option>
+                                                        <option value="4">4 Guests</option>
+                                                        <option value="5">5 Guests</option>
+                                                        <option value="6">6 Guests</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Hotel ID (Optional)</label>
+                                                    <input type="text" class="form-control" name="hotel_id" placeholder="Hotel UUID">
+                                                </div>
+                                                <div class="col-md-1 d-flex align-items-end">
+                                                    <button type="submit" class="btn btn-danger w-100">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                        <div id="hotelSearchResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <!-- Hotel Search by Capacity Only -->
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #8e44ad, #7d3c98);">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/hotels/search-capacity/</strong>
+                                        <small class="ms-2">⚡ Quick Search</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <h6 class="mb-3">
+                                            <i class="fas fa-users me-2"></i>
+                                            Search Hotels by Capacity Only
+                                        </h6>
+                                        <p class="text-muted mb-3">
+                                            Find hotels with room types that can accommodate your guest count (no date requirements).
+                                        </p>
+                                        <form id="hotelCapacitySearchForm">
+                                            <div class="row">
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Number of Guests</label>
+                                                    <select class="form-select" name="capacity" id="capacitySearchGuests" required>
+                                                        <option value="">Select guests</option>
+                                                        <option value="1">1 Guest</option>
+                                                        <option value="2" selected>2 Guests</option>
+                                                        <option value="3">3 Guests</option>
+                                                        <option value="4">4 Guests</option>
+                                                        <option value="5">5 Guests</option>
+                                                        <option value="6">6 Guests</option>
+                                                        <option value="8">8 Guests</option>
+                                                        <option value="10">10 Guests</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Hotel ID (Optional)</label>
+                                                    <input type="text" class="form-control" name="hotel_id" placeholder="Specific hotel ID">
+                                                </div>
+                                                <div class="col-md-3 d-flex align-items-end">
+                                                    <button type="submit" class="btn btn-purple w-100" style="background: linear-gradient(135deg, #8e44ad, #7d3c98); border: none;">
+                                                        <i class="fas fa-search me-2"></i>Search by Capacity
+                                                    </button>
+                                                </div>
+                                                <div class="col-md-2 d-flex align-items-end">
+                                                    <button type="button" class="btn btn-outline-secondary w-100" onclick="clearCapacitySearch()">
+                                                        <i class="fas fa-eraser"></i> Clear
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                        <div id="hotelCapacitySearchResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bookings Section -->
+            <section id="bookings-section" class="mb-5">
+                <div class="card endpoint-card">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="fas fa-calendar-check me-2"></i>
+                            Bookings Management
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- List Bookings -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/bookings/</strong>
+                                        <small class="ms-2">🔒 Auth Required</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="text-muted">Get user's bookings</p>
+                                        <button class="btn btn-info w-100" onclick="listBookings()">
+                                            <i class="fas fa-list me-2"></i>
+                                            Get My Bookings
+                                        </button>
+                                        <div id="bookingsResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Create Booking -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <span class="method-badge method-post">POST</span>
+                                        <strong>/bookings/</strong>
+                                        <small class="ms-2">🔒 Auth Required</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="createBookingForm">
+                                            <div class="mb-3">
+                                                <label class="form-label">Hotel ID</label>
+                                                <input type="text" class="form-control" name="hotel" placeholder="Hotel UUID" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Room Type ID</label>
+                                                <input type="text" class="form-control" name="room_type" placeholder="Room Type UUID" required>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-6">
+                                                    <label class="form-label">Check-in</label>
+                                                    <input type="date" class="form-control" name="check_in" required>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label">Check-out</label>
+                                                    <input type="date" class="form-control" name="check_out" required>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Number of Guests</label>
+                                                <input type="number" class="form-control" name="guests" min="1" max="10" value="2" required>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary w-100">
+                                                <i class="fas fa-plus me-2"></i>
+                                                Create Booking
+                                            </button>
+                                        </form>
+                                        <div id="createBookingResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile Section -->
+            <section id="profile-section" class="mb-5">
+                <div class="card endpoint-card">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="fas fa-user me-2"></i>
+                            User Profile
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Get Profile -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/auth/profile/</strong>
+                                        <small class="ms-2">🔒 Auth Required</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="text-muted">Get current user profile</p>
+                                        <button class="btn btn-info w-100" onclick="getUserProfile()">
+                                            <i class="fas fa-user me-2"></i>
+                                            Get Profile
+                                        </button>
+                                        <div id="profileResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Logout -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-danger text-white">
+                                        <span class="method-badge method-post">POST</span>
+                                        <strong>/auth/logout/</strong>
+                                        <small class="ms-2">🔒 Auth Required</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="text-muted">Logout current user</p>
+                                        <button class="btn btn-danger w-100" onclick="logoutUser()">
+                                            <i class="fas fa-sign-out-alt me-2"></i>
+                                            Logout
+                                        </button>
+                                        <div id="logoutResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let totalRequests = 0;
+    let successfulRequests = 0;
+
+    // Update stats
+    function updateStats() {
+        document.getElementById('totalRequests').textContent = totalRequests;
+        const successRate = totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 100;
+        document.getElementById('successRate').textContent = successRate + '%';
+    }
+
+    // Track request
+    function trackRequest(success) {
+        totalRequests++;
+        if (success) successfulRequests++;
+        updateStats();
+    }
+
+    // Scroll to section
+    function scrollToSection(sectionId) {
+        document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+        
+        // Update active nav
+        document.querySelectorAll('.sidebar-nav a').forEach(link => {
+            link.classList.remove('active');
+        });
+        document.querySelector(`[href="#${sectionId}"]`).classList.add('active');
+    }
+
+    // Clear auth token
+    function clearAuthToken() {
+        authToken = '';
+        localStorage.removeItem('authToken');
+        document.getElementById('authTokenDisplay').style.display = 'none';
+        showToast('Auth token cleared', 'warning');
+    }
+
+    // Set auth token
+    function setAuthToken(token) {
+        authToken = token;
+        localStorage.setItem('authToken', token);
+        
+        const display = document.getElementById('authTokenDisplay');
+        display.style.display = 'block';
+        document.querySelector('.auth-token-display').textContent = token.substring(0, 50) + '...';
+        showToast('Auth token saved', 'success');
+    }
+
+    // Login
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        
+        const response = await makeApiRequest('POST', apiBaseUrl + '/auth/login/', data, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('loginResponse', response);
+        document.getElementById('loginResponse').style.display = 'block';
+        
+        if (response.ok && response.data.access) {
+            setAuthToken(response.data.access);
+        }
+    });
+
+    // Register
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        
+        // Validate password confirmation
+        if (data.password !== data.password_confirm) {
+            showToast('Passwords do not match', 'danger');
+            return;
+        }
+        
+        // Remove password2 from data as API doesn't need it in some cases
+        // Keep it in case the API expects it
+        
+        const response = await makeApiRequest('POST', apiBaseUrl + '/auth/register/', data, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('registerResponse', response);
+        document.getElementById('registerResponse').style.display = 'block';
+        
+        // Clear form on successful registration
+        if (response.ok) {
+            document.getElementById('registerForm').reset();
+            showToast('Registration successful!', 'success');
+        }
+    });
+
+    // Create Booking
+    document.getElementById('createBookingForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (!authToken) {
+            showToast('Please login first', 'warning');
+            return;
+        }
+        
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        
+        const response = await makeApiRequest('POST', apiBaseUrl + '/bookings/', data);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('createBookingResponse', response);
+        document.getElementById('createBookingResponse').style.display = 'block';
+    });
+
+    // List Hotels
+    async function listHotels() {
+        const response = await makeApiRequest('GET', apiBaseUrl + '/hotels/', null, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('hotelsResponse', response);
+        document.getElementById('hotelsResponse').style.display = 'block';
+    }
+
+    // Get Hotel Details
+    async function getHotelDetails() {
+        const hotelId = document.getElementById('hotelIdInput').value;
+        if (!hotelId) {
+            showToast('Please enter a hotel ID', 'warning');
+            return;
+        }
+        
+        const response = await makeApiRequest('GET', apiBaseUrl + `/hotels/${hotelId}/`, null, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('hotelDetailsResponse', response);
+        document.getElementById('hotelDetailsResponse').style.display = 'block';
+    }
+
+    // Get Hotel Rooms
+    async function getHotelRooms() {
+        const hotelId = document.getElementById('hotelRoomsIdInput').value;
+        if (!hotelId) {
+            showToast('Please enter a hotel ID', 'warning');
+            return;
+        }
+        
+        const response = await makeApiRequest('GET', apiBaseUrl + `/hotels/${hotelId}/rooms/`, null, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('hotelRoomsResponse', response);
+        document.getElementById('hotelRoomsResponse').style.display = 'block';
+    }
+
+    // Check Availability
+    async function checkAvailability() {
+        const hotelId = document.getElementById('availabilityHotelIdInput').value;
+        const checkIn = document.getElementById('checkInDate').value;
+        const checkOut = document.getElementById('checkOutDate').value;
+        
+        if (!hotelId || !checkIn || !checkOut) {
+            showToast('Please fill all required fields', 'warning');
+            return;
+        }
+        
+        const url = `${apiBaseUrl}/hotels/${hotelId}/availability/?check_in=${checkIn}&check_out=${checkOut}`;
+        const response = await makeApiRequest('GET', url, null, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('availabilityResponse', response);
+        document.getElementById('availabilityResponse').style.display = 'block';
+    }
+
+    // Hotel Search with Dates and Capacity
+    document.getElementById('hotelSearchForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const params = new URLSearchParams();
+        
+        // Add all form data to URL parameters
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                params.append(key, value);
+            }
+        }
+        
+        const url = `${apiBaseUrl}/hotels/search-availability/?${params.toString()}`;
+        const response = await makeApiRequest('GET', url, null, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('hotelSearchResponse', response);
+        document.getElementById('hotelSearchResponse').style.display = 'block';
+        
+        // Show summary toast
+        if (response.ok) {
+            const count = response.data.count || 0;
+            const nights = response.data.search_criteria?.nights || 0;
+            showToast(`Found ${count} hotel(s) for ${nights} night(s)`, 'success');
+        }
+    });
+
+    // Hotel Search by Capacity Only
+    document.getElementById('hotelCapacitySearchForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const params = new URLSearchParams();
+        
+        // Add all form data to URL parameters
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                params.append(key, value);
+            }
+        }
+        
+        const url = `${apiBaseUrl}/hotels/search-capacity/?${params.toString()}`;
+        const response = await makeApiRequest('GET', url, null, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('hotelCapacitySearchResponse', response);
+        document.getElementById('hotelCapacitySearchResponse').style.display = 'block';
+        
+        // Show summary toast
+        if (response.ok) {
+            const count = response.data.count || 0;
+            const capacity = formData.get('capacity');
+            showToast(`Found ${count} hotel(s) with capacity for ${capacity} guests`, 'success');
+        }
+    });
+
+    // Clear Capacity Search
+    function clearCapacitySearch() {
+        document.getElementById('hotelCapacitySearchForm').reset();
+        document.getElementById('hotelCapacitySearchResponse').style.display = 'none';
+        document.getElementById('hotelCapacitySearchResponse').innerHTML = '';
+        showToast('Capacity search cleared', 'info');
+    }
+
+    // List Bookings
+    async function listBookings() {
+        if (!authToken) {
+            showToast('Please login first', 'warning');
+            return;
+        }
+        
+        const response = await makeApiRequest('GET', apiBaseUrl + '/bookings/');
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('bookingsResponse', response);
+        document.getElementById('bookingsResponse').style.display = 'block';
+    }
+
+    // Get User Profile
+    async function getUserProfile() {
+        if (!authToken) {
+            showToast('Please login first', 'warning');
+            return;
+        }
+        
+        const response = await makeApiRequest('GET', apiBaseUrl + '/auth/profile/');
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('profileResponse', response);
+        document.getElementById('profileResponse').style.display = 'block';
+    }
+
+    // Logout User
+    async function logoutUser() {
+        if (!authToken) {
+            showToast('No active session', 'warning');
+            return;
+        }
+        
+        const response = await makeApiRequest('POST', apiBaseUrl + '/auth/logout/');
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('logoutResponse', response);
+        document.getElementById('logoutResponse').style.display = 'block';
+        
+        if (response.ok) {
+            clearAuthToken();
+        }
+    }
+
+    // Set default dates
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dayAfter = new Date(today);
+        dayAfter.setDate(dayAfter.getDate() + 2);
+        
+        document.getElementById('checkInDate').value = tomorrow.toISOString().split('T')[0];
+        document.getElementById('checkOutDate').value = dayAfter.toISOString().split('T')[0];
+        document.querySelector('input[name="check_in"]').value = tomorrow.toISOString().split('T')[0];
+        document.querySelector('input[name="check_out"]').value = dayAfter.toISOString().split('T')[0];
+        
+        // Show auth token if exists
+        if (authToken) {
+            const display = document.getElementById('authTokenDisplay');
+            display.style.display = 'block';
+            document.querySelector('.auth-token-display').textContent = authToken.substring(0, 50) + '...';
+        }
+    });
+</script>
+{% endblock %}

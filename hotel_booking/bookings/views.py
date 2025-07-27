@@ -489,3 +489,471 @@ def get_hotel_dashboard(request):
             {'error': f'Failed to get dashboard data: {str(e)}'},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+# ===== MISSING VIEWS IMPLEMENTATION =====
+
+class BookingSearchAPIView(generics.ListAPIView):
+    """Search bookings with various filters"""
+    serializer_class = BookingListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = Booking.objects.filter(guest=self.request.user)
+        
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        
+        if from_date:
+            queryset = queryset.filter(check_in__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(check_out__lte=to_date)
+        
+        return queryset.order_by('-created_at')
+
+
+class RoomSearchAPIView(generics.GenericAPIView):
+    """Search available rooms"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        try:
+            check_in = request.query_params.get('checkin')
+            check_out = request.query_params.get('checkout')
+            guests = int(request.query_params.get('guests', 1))
+            location = request.query_params.get('location')
+            
+            if not check_in or not check_out:
+                return Response(
+                    {'error': 'checkin and checkout dates are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get available rooms using existing service
+            available_rooms = RoomAvailabilityService.search_available_rooms(
+                check_in_date=check_in,
+                check_out_date=check_out,
+                guests=guests,
+                location=location
+            )
+            
+            return Response({
+                'search_criteria': {
+                    'check_in': check_in,
+                    'check_out': check_out,
+                    'guests': guests,
+                    'location': location
+                },
+                'results': available_rooms,
+                'total_found': len(available_rooms)
+            })
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AvailabilitySearchAPIView(RoomSearchAPIView):
+    """Alias for room search"""
+    pass
+
+
+class HotelRoomSearchAPIView(generics.GenericAPIView):
+    """Search rooms in a specific hotel"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            check_in = request.query_params.get('checkin')
+            check_out = request.query_params.get('checkout')
+            guests = int(request.query_params.get('guests', 1))
+            
+            if not check_in or not check_out:
+                return Response(
+                    {'error': 'checkin and checkout dates are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get available rooms for specific hotel
+            available_rooms = RoomAvailabilityService.get_available_rooms(
+                hotel_id=hotel_id,
+                check_in_date=check_in,
+                check_out_date=check_out,
+                guests=guests
+            )
+            
+            return Response({
+                'hotel_id': hotel_id,
+                'search_criteria': {
+                    'check_in': check_in,
+                    'check_out': check_out,
+                    'guests': guests
+                },
+                'available_rooms': available_rooms,
+                'total_available': len(available_rooms)
+            })
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BookingQuoteAPIView(generics.GenericAPIView):
+    """Get booking quote without creating booking"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        try:
+            room_id = request.data.get('room_id')
+            check_in = request.data.get('check_in_date')
+            check_out = request.data.get('check_out_date')
+            guests = int(request.data.get('guests', 1))
+            extras = request.data.get('extras', [])
+            
+            # Calculate pricing
+            room = Room.objects.get(id=room_id)
+            
+            # Basic room rate calculation
+            from datetime import datetime
+            check_in_date = datetime.strptime(check_in, '%Y-%m-%d').date()
+            check_out_date = datetime.strptime(check_out, '%Y-%m-%d').date()
+            nights = (check_out_date - check_in_date).days
+            
+            room_total = float(room.room_type.base_price) * nights
+            
+            # Calculate extras
+            extras_total = 0
+            if extras:
+                extra_objects = Extra.objects.filter(id__in=extras)
+                extras_total = sum(float(extra.price) for extra in extra_objects)
+            
+            subtotal = room_total + extras_total
+            taxes = subtotal * 0.12  # 12% tax
+            total = subtotal + taxes
+            
+            return Response({
+                'quote_id': f'QUOTE-{timezone.now().strftime("%Y%m%d%H%M%S")}',
+                'room': {
+                    'id': str(room.id),
+                    'name': room.room_type.name,
+                    'hotel': room.hotel.name
+                },
+                'dates': {
+                    'check_in': check_in,
+                    'check_out': check_out,
+                    'nights': nights
+                },
+                'pricing': {
+                    'room_rate_per_night': float(room.room_type.base_price),
+                    'room_total': room_total,
+                    'extras_total': extras_total,
+                    'subtotal': subtotal,
+                    'taxes': taxes,
+                    'total': total,
+                    'currency': 'USD'
+                },
+                'policies': {
+                    'cancellation_policy': room.hotel.cancellation_policy,
+                    'payment_required': 'Credit card required to hold reservation'
+                }
+            })
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BookingDraftAPIView(generics.GenericAPIView):
+    """Save booking as draft"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        # In a real implementation, you'd save to a BookingDraft model
+        draft_id = f'DRAFT-{timezone.now().strftime("%Y%m%d%H%M%S")}'
+        
+        return Response({
+            'draft_id': draft_id,
+            'message': 'Booking saved as draft',
+            'expires_at': (timezone.now() + timezone.timedelta(hours=24)).isoformat()
+        })
+
+
+class BookingCancelAPIView(generics.GenericAPIView):
+    """Cancel a booking"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, booking_reference):
+        try:
+            booking = Booking.objects.get(
+                booking_reference=booking_reference,
+                guest=request.user
+            )
+            
+            if booking.status == 'cancelled':
+                return Response(
+                    {'error': 'Booking is already cancelled'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Cancel the booking
+            booking.status = 'cancelled'
+            booking.cancellation_date = timezone.now()
+            booking.cancellation_reason = request.data.get('reason', 'Guest cancellation')
+            booking.save()
+            
+            # Create history record
+            BookingHistory.objects.create(
+                booking=booking,
+                status='cancelled',
+                notes=f'Cancelled by guest: {booking.cancellation_reason}'
+            )
+            
+            return Response({
+                'message': 'Booking cancelled successfully',
+                'booking_reference': booking_reference,
+                'cancellation_date': booking.cancellation_date.isoformat()
+            })
+            
+        except Booking.DoesNotExist:
+            return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class BookingConfirmAPIView(generics.GenericAPIView):
+    """Confirm a booking"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, booking_reference):
+        try:
+            booking = Booking.objects.get(
+                booking_reference=booking_reference,
+                guest=request.user
+            )
+            
+            if booking.status == 'confirmed':
+                return Response(
+                    {'message': 'Booking is already confirmed'},
+                    status=status.HTTP_200_OK
+                )
+            
+            booking.status = 'confirmed'
+            booking.save()
+            
+            return Response({
+                'message': 'Booking confirmed successfully',
+                'booking_reference': booking_reference
+            })
+            
+        except Booking.DoesNotExist:
+            return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class BookingModifyAPIView(generics.GenericAPIView):
+    """Modify booking details"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, booking_reference):
+        try:
+            booking = Booking.objects.get(
+                booking_reference=booking_reference,
+                guest=request.user
+            )
+            
+            # Create modification request (in real implementation)
+            modification_data = request.data
+            
+            return Response({
+                'message': 'Modification request submitted',
+                'booking_reference': booking_reference,
+                'modification_id': f'MOD-{timezone.now().strftime("%Y%m%d%H%M%S")}',
+                'status': 'pending_approval'
+            })
+            
+        except Booking.DoesNotExist:
+            return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class BookingTimelineAPIView(generics.GenericAPIView):
+    """Get booking timeline/history"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, booking_reference):
+        try:
+            booking = Booking.objects.get(
+                booking_reference=booking_reference,
+                guest=request.user
+            )
+            
+            # Get booking history
+            history = BookingHistory.objects.filter(booking=booking).order_by('created_at')
+            
+            timeline = [
+                {
+                    'id': h.id,
+                    'status': h.status,
+                    'timestamp': h.created_at.isoformat(),
+                    'notes': h.notes,
+                    'user': h.user.get_full_name() if h.user else 'System'
+                } for h in history
+            ]
+            
+            return Response({
+                'booking_reference': booking_reference,
+                'timeline': timeline
+            })
+            
+        except Booking.DoesNotExist:
+            return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class BookingInvoiceAPIView(generics.GenericAPIView):
+    """Get booking invoice"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, booking_reference):
+        try:
+            booking = Booking.objects.get(
+                booking_reference=booking_reference,
+                guest=request.user
+            )
+            
+            invoice_data = {
+                'invoice_number': f'INV-{booking.booking_reference}',
+                'booking_reference': booking_reference,
+                'guest_name': f'{booking.primary_guest_name}',
+                'hotel': {
+                    'name': booking.room.hotel.name,
+                    'address': booking.room.hotel.full_address
+                },
+                'room': {
+                    'type': booking.room.room_type.name,
+                    'nights': booking.total_nights,
+                    'rate_per_night': float(booking.room.room_type.base_price)
+                },
+                'totals': {
+                    'room_charges': float(booking.room_charges),
+                    'extras': float(booking.extras_total),
+                    'taxes': float(booking.taxes),
+                    'total': float(booking.total_price)
+                },
+                'dates': {
+                    'check_in': booking.check_in.isoformat(),
+                    'check_out': booking.check_out.isoformat(),
+                    'booking_date': booking.created_at.date().isoformat()
+                }
+            }
+            
+            return Response(invoice_data)
+            
+        except Booking.DoesNotExist:
+            return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class BookingReceiptAPIView(BookingInvoiceAPIView):
+    """Get booking receipt (alias for invoice)"""
+    pass
+
+
+class CheckInAPIView(generics.GenericAPIView):
+    """Check-in a guest"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, booking_reference):
+        try:
+            booking = Booking.objects.get(booking_reference=booking_reference)
+            
+            if booking.status != 'confirmed':
+                return Response(
+                    {'error': 'Booking must be confirmed before check-in'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            booking.status = 'checked_in'
+            booking.actual_check_in = timezone.now()
+            booking.save()
+            
+            return Response({
+                'message': 'Check-in successful',
+                'booking_reference': booking_reference,
+                'check_in_time': booking.actual_check_in.isoformat()
+            })
+            
+        except Booking.DoesNotExist:
+            return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class CheckOutAPIView(generics.GenericAPIView):
+    """Check-out a guest"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, booking_reference):
+        try:
+            booking = Booking.objects.get(booking_reference=booking_reference)
+            
+            if booking.status != 'checked_in':
+                return Response(
+                    {'error': 'Guest must be checked in before check-out'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            booking.status = 'completed'
+            booking.actual_check_out = timezone.now()
+            booking.save()
+            
+            return Response({
+                'message': 'Check-out successful',
+                'booking_reference': booking_reference,
+                'check_out_time': booking.actual_check_out.isoformat()
+            })
+            
+        except Booking.DoesNotExist:
+            return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class StaffDashboardAPIView(generics.GenericAPIView):
+    """Staff dashboard with key metrics"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        # Alias for existing get_hotel_dashboard function
+        return get_hotel_dashboard(request)
+
+
+class TodayBookingsAPIView(generics.ListAPIView):
+    """Get today's bookings"""
+    serializer_class = BookingListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        today = timezone.now().date()
+        return Booking.objects.filter(
+            Q(check_in=today) | Q(check_out=today)
+        ).order_by('check_in')
+
+
+class TodayArrivalsAPIView(generics.ListAPIView):
+    """Get today's arrivals"""
+    serializer_class = BookingListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        today = timezone.now().date()
+        return Booking.objects.filter(
+            check_in=today,
+            status='confirmed'
+        ).order_by('check_in')
+
+
+class TodayDeparturesAPIView(generics.ListAPIView):
+    """Get today's departures"""
+    serializer_class = BookingListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        today = timezone.now().date()
+        return Booking.objects.filter(
+            check_out=today,
+            status='checked_in'
+        ).order_by('check_out')

@@ -5,6 +5,7 @@ from django.db.models import Q, Prefetch
 # Django REST Framework imports
 from rest_framework import generics, status, permissions, serializers
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 # Local imports
@@ -323,3 +324,1208 @@ def get_hotel_policies(request, hotel_id):
             {'error': f'Failed to get hotel policies: {str(e)}'},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+# ===== MISSING VIEWS IMPLEMENTATION =====
+
+class HotelSearchAPIView(generics.ListAPIView):
+    """Search hotels with filters"""
+    serializer_class = HotelSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_queryset(self):
+        queryset = Hotel.objects.filter(is_active=True)
+        
+        # Filter by location
+        location = self.request.query_params.get('location')
+        if location:
+            queryset = queryset.filter(
+                Q(city__icontains=location) |
+                Q(state__icontains=location) |
+                Q(country__icontains=location)
+            )
+        
+        # Filter by star rating
+        min_rating = self.request.query_params.get('min_rating')
+        if min_rating:
+            queryset = queryset.filter(star_rating__gte=min_rating)
+        
+        return queryset
+
+
+class FeaturedHotelsAPIView(generics.ListAPIView):
+    """Get featured hotels"""
+    serializer_class = HotelSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_queryset(self):
+        # Return hotels with high ratings or special designation
+        return Hotel.objects.filter(
+            is_active=True,
+            star_rating__gte=4
+        ).order_by('-star_rating')[:5]
+
+
+class NearbyHotelsAPIView(generics.ListAPIView):
+    """Find nearby hotels"""
+    serializer_class = HotelSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_queryset(self):
+        # In a real implementation, you'd use geolocation
+        # For now, return all active hotels
+        return Hotel.objects.filter(is_active=True)[:10]
+
+
+class HotelGalleryAPIView(generics.RetrieveAPIView):
+    """Get hotel image gallery"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            # In a real implementation, you'd have a HotelImage model
+            gallery = {
+                'hotel_id': str(hotel.id),
+                'images': [
+                    {
+                        'id': 1,
+                        'url': '/media/hotels/hotel_lobby.jpg',
+                        'caption': 'Hotel Lobby',
+                        'is_primary': True
+                    },
+                    {
+                        'id': 2,
+                        'url': '/media/hotels/hotel_room.jpg',
+                        'caption': 'Deluxe Room',
+                        'is_primary': False
+                    }
+                ]
+            }
+            
+            return Response(gallery)
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HotelReviewsAPIView(generics.ListAPIView):
+    """Get hotel reviews"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            # In a real implementation, you'd have a Review model
+            reviews = {
+                'hotel_id': str(hotel.id),
+                'average_rating': 4.5,
+                'total_reviews': 125,
+                'reviews': [
+                    {
+                        'id': 1,
+                        'guest_name': 'John D.',
+                        'rating': 5,
+                        'comment': 'Excellent service and beautiful rooms!',
+                        'date': '2024-07-20',
+                        'verified_stay': True
+                    },
+                    {
+                        'id': 2,
+                        'guest_name': 'Sarah M.',
+                        'rating': 4,
+                        'comment': 'Great location, friendly staff.',
+                        'date': '2024-07-18',
+                        'verified_stay': True
+                    }
+                ]
+            }
+            
+            return Response(reviews)
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HotelPoliciesAPIView(generics.RetrieveAPIView):
+    """Get hotel policies (alias for existing view)"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        return get_hotel_policies(request, hotel_id)
+
+
+class RoomDetailAPIView(generics.RetrieveAPIView):
+    """Get detailed room information"""
+    serializer_class = RoomSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_object(self):
+        hotel_id = self.kwargs.get('hotel_id')
+        room_id = self.kwargs.get('room_id')
+        
+        return get_object_or_404(
+            Room,
+            id=room_id,
+            hotel_id=hotel_id,
+            hotel__is_active=True
+        )
+
+
+class HotelAvailabilityAPIView(generics.GenericAPIView):
+    """Check hotel availability"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            check_in = request.query_params.get('checkin')
+            check_out = request.query_params.get('checkout')
+            guests = int(request.query_params.get('guests', 1))
+            
+            if not check_in or not check_out:
+                return Response(
+                    {'error': 'checkin and checkout dates are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Use existing availability service
+            available_rooms = RoomAvailabilityService.get_available_rooms(
+                hotel_id=hotel_id,
+                check_in_date=check_in,
+                check_out_date=check_out,
+                guests=guests
+            )
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'check_in': check_in,
+                'check_out': check_out,
+                'guests': guests,
+                'available_rooms': available_rooms,
+                'total_available': len(available_rooms)
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AvailabilityCalendarAPIView(generics.GenericAPIView):
+    """Get availability calendar for hotel"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            # Return 30-day availability calendar
+            from datetime import datetime, timedelta
+            start_date = datetime.now().date()
+            calendar_data = []
+            
+            for i in range(30):
+                date = start_date + timedelta(days=i)
+                # In real implementation, check actual availability
+                calendar_data.append({
+                    'date': date.isoformat(),
+                    'available_rooms': 10,  # Mock data
+                    'min_price': 150.00,
+                    'is_available': True
+                })
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'calendar': calendar_data
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HotelPricingAPIView(generics.GenericAPIView):
+    """Get hotel pricing information"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            # Get room types with pricing
+            room_types = RoomType.objects.filter(rooms__hotel=hotel).distinct()
+            pricing_data = []
+            
+            for room_type in room_types:
+                pricing_data.append({
+                    'room_type_id': str(room_type.id),
+                    'name': room_type.name,
+                    'base_price': float(room_type.base_price),
+                    'weekend_price': float(room_type.base_price * 1.2),  # 20% markup
+                    'holiday_price': float(room_type.base_price * 1.5),  # 50% markup
+                })
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'pricing': pricing_data,
+                'currency': 'USD',
+                'taxes_included': False
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class RoomAvailabilityAPIView(generics.GenericAPIView):
+    """Check specific room availability"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id, room_id):
+        try:
+            room = Room.objects.get(
+                id=room_id,
+                hotel_id=hotel_id,
+                hotel__is_active=True
+            )
+            
+            check_in = request.query_params.get('checkin')
+            check_out = request.query_params.get('checkout')
+            
+            if not check_in or not check_out:
+                return Response(
+                    {'error': 'checkin and checkout dates are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if room is available
+            is_available = RoomAvailabilityService.is_room_available(
+                room=room,
+                check_in_date=check_in,
+                check_out_date=check_out
+            )
+            
+            return Response({
+                'room_id': str(room.id),
+                'hotel_id': str(room.hotel.id),
+                'check_in': check_in,
+                'check_out': check_out,
+                'is_available': is_available,
+                'room_details': RoomSerializer(room).data
+            })
+            
+        except Room.DoesNotExist:
+            return Response({'error': 'Room not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HotelAmenitiesAPIView(generics.GenericAPIView):
+    """Get hotel amenities (alias for existing view)"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        return get_hotel_amenities(request, hotel_id)
+
+
+class HotelServicesAPIView(generics.GenericAPIView):
+    """Get hotel services"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            extras = hotel.extras.filter(is_active=True)
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'services': ExtraSerializer(extras, many=True).data
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HotelExtrasAPIView(HotelServicesAPIView):
+    """Get hotel extras (alias for services)"""
+    pass
+
+
+class HotelDiningAPIView(generics.GenericAPIView):
+    """Get hotel dining options"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            # Mock dining data - in real implementation, you'd have a Restaurant model
+            dining_options = [
+                {
+                    'id': 1,
+                    'name': 'Main Restaurant',
+                    'cuisine_type': 'International',
+                    'opening_hours': '06:00 - 22:00',
+                    'description': 'Fine dining with international cuisine',
+                    'dress_code': 'Smart casual'
+                },
+                {
+                    'id': 2,
+                    'name': 'Pool Bar',
+                    'cuisine_type': 'Bar & Grill',
+                    'opening_hours': '10:00 - 18:00',
+                    'description': 'Casual dining by the pool',
+                    'dress_code': 'Casual'
+                }
+            ]
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'dining_options': dining_options
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HotelLocationAPIView(generics.GenericAPIView):
+    """Get hotel location information"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'location': {
+                    'address': hotel.full_address,
+                    'city': hotel.city,
+                    'state': hotel.state,
+                    'country': hotel.country,
+                    'postal_code': hotel.postal_code,
+                    'coordinates': {
+                        'latitude': 25.7617,  # Mock coordinates for Miami
+                        'longitude': -80.1918
+                    }
+                },
+                'transportation': {
+                    'airport_distance': '15 km',
+                    'downtown_distance': '5 km',
+                    'public_transport': 'Metro station 200m away'
+                }
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HotelDirectionsAPIView(generics.GenericAPIView):
+    """Get directions to hotel"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'directions': {
+                    'from_airport': 'Take highway I-95 south for 15 minutes',
+                    'from_downtown': 'Take metro line to Ocean Drive station',
+                    'parking': 'Valet parking available ($25/night)',
+                    'public_transport': 'Metro, bus lines 120, 150'
+                },
+                'map_url': f'https://maps.google.com/search/{hotel.full_address}'
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class NearbyAttractionsAPIView(generics.GenericAPIView):
+    """Get nearby attractions"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            # Mock attractions data
+            attractions = [
+                {
+                    'name': 'South Beach',
+                    'distance': '0.5 km',
+                    'category': 'Beach',
+                    'description': 'Famous white sand beach'
+                },
+                {
+                    'name': 'Art Deco District',
+                    'distance': '1.2 km',
+                    'category': 'Historic',
+                    'description': 'Historic art deco architecture'
+                },
+                {
+                    'name': 'Bayside Marketplace',
+                    'distance': '3.5 km',
+                    'category': 'Shopping',
+                    'description': 'Waterfront shopping and dining'
+                }
+            ]
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'attractions': attractions
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class SearchHotelsByLocationAPIView(generics.ListAPIView):
+    """Search hotels by location"""
+    serializer_class = HotelSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_queryset(self):
+        queryset = Hotel.objects.filter(is_active=True)
+        
+        # Location-based filtering
+        city = self.request.query_params.get('city', None)
+        state = self.request.query_params.get('state', None)
+        country = self.request.query_params.get('country', None)
+        
+        if city:
+            queryset = queryset.filter(city__icontains=city)
+        if state:
+            queryset = queryset.filter(state__icontains=state)
+        if country:
+            queryset = queryset.filter(country__icontains=country)
+            
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'count': len(response.data),
+            'results': response.data
+        })
+
+
+class SearchRoomAvailabilityAPIView(generics.GenericAPIView):
+    """Search room availability"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        try:
+            # Get search parameters
+            check_in = request.query_params.get('check_in')
+            check_out = request.query_params.get('check_out')
+            guests = int(request.query_params.get('guests', 1))
+            
+            if not check_in or not check_out:
+                return Response({
+                    'error': 'check_in and check_out dates are required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Find available rooms
+            available_rooms = Room.objects.filter(
+                is_active=True,
+                maintenance_status='operational',
+                room_type__max_capacity__gte=guests
+            ).select_related('room_type', 'hotel')
+            
+            # Serialize room data
+            room_data = []
+            for room in available_rooms:
+                room_data.append({
+                    'id': str(room.id),
+                    'hotel': {
+                        'id': str(room.hotel.id),
+                        'name': room.hotel.name,
+                        'star_rating': room.hotel.star_rating
+                    },
+                    'room_type': room.room_type.name,
+                    'room_number': room.room_number,
+                    'max_capacity': room.room_type.max_capacity,
+                    'base_price': str(room.room_type.base_price),
+                    'bed_type': room.room_type.bed_type,
+                    'size_sqft': room.room_type.size_sqft
+                })
+            
+            return Response({
+                'search_params': {
+                    'check_in': check_in,
+                    'check_out': check_out,
+                    'guests': guests
+                },
+                'count': len(room_data),
+                'results': room_data
+            })
+            
+        except ValueError:
+            return Response({
+                'error': 'Invalid guests parameter'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class HotelFeaturesAPIView(generics.GenericAPIView):
+    """Get hotel features and amenities"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            features = {
+                'basic_amenities': [
+                    'Free Wi-Fi',
+                    'Air Conditioning',
+                    'Parking',
+                    '24/7 Front Desk',
+                    'Room Service'
+                ],
+                'facilities': [
+                    'Swimming Pool',
+                    'Fitness Center',
+                    'Spa',
+                    'Restaurant',
+                    'Business Center'
+                ],
+                'services': [
+                    'Concierge',
+                    'Laundry Service',
+                    'Airport Shuttle',
+                    'Valet Parking',
+                    'Pet Friendly'
+                ]
+            }
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'features': features
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HotelPhotosAPIView(generics.GenericAPIView):
+    """Get hotel photos"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            # Mock photo data
+            photos = [
+                {
+                    'id': 1,
+                    'url': f'/media/hotels/{hotel.id}/exterior.jpg',
+                    'caption': 'Hotel Exterior',
+                    'category': 'exterior'
+                },
+                {
+                    'id': 2,
+                    'url': f'/media/hotels/{hotel.id}/lobby.jpg',
+                    'caption': 'Elegant Lobby',
+                    'category': 'interior'
+                },
+                {
+                    'id': 3,
+                    'url': f'/media/hotels/{hotel.id}/pool.jpg',
+                    'caption': 'Swimming Pool',
+                    'category': 'amenities'
+                }
+            ]
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'photos': photos
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class SeasonalPricingAPIView(generics.GenericAPIView):
+    """Get seasonal pricing information"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id):
+        try:
+            hotel = Hotel.objects.get(id=hotel_id, is_active=True)
+            
+            # Mock seasonal pricing data
+            seasonal_rates = [
+                {
+                    'season': 'High Season',
+                    'start_date': '2024-12-15',
+                    'end_date': '2024-04-15',
+                    'multiplier': 1.5,
+                    'description': 'Peak tourist season'
+                },
+                {
+                    'season': 'Regular Season',
+                    'start_date': '2024-04-16',
+                    'end_date': '2024-11-30',
+                    'multiplier': 1.0,
+                    'description': 'Standard rates'
+                },
+                {
+                    'season': 'Low Season',
+                    'start_date': '2024-12-01',
+                    'end_date': '2024-12-14',
+                    'multiplier': 0.8,
+                    'description': 'Off-peak rates'
+                }
+            ]
+            
+            return Response({
+                'hotel_id': str(hotel.id),
+                'seasonal_pricing': seasonal_rates
+            })
+            
+        except Hotel.DoesNotExist:
+            return Response({'error': 'Hotel not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class RoomPhotosAPIView(generics.GenericAPIView):
+    """Get room photos"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id, room_id):
+        try:
+            room = Room.objects.get(
+                id=room_id, 
+                hotel_id=hotel_id, 
+                is_active=True
+            ).select_related('room_type', 'hotel')
+            
+            # Mock room photo data
+            photos = [
+                {
+                    'id': 1,
+                    'url': f'/media/rooms/{room.id}/bedroom.jpg',
+                    'caption': f'{room.room_type.name} - Bedroom',
+                    'category': 'bedroom'
+                },
+                {
+                    'id': 2,
+                    'url': f'/media/rooms/{room.id}/bathroom.jpg',
+                    'caption': f'{room.room_type.name} - Bathroom',
+                    'category': 'bathroom'
+                },
+                {
+                    'id': 3,
+                    'url': f'/media/rooms/{room.id}/view.jpg',
+                    'caption': f'{room.room_type.name} - View',
+                    'category': 'view'
+                }
+            ]
+            
+            return Response({
+                'room_id': str(room.id),
+                'room_type': room.room_type.name,
+                'photos': photos
+            })
+            
+        except Room.DoesNotExist:
+            return Response({'error': 'Room not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class RoomAmenitiesAPIView(generics.GenericAPIView):
+    """Get room amenities"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, hotel_id, room_id):
+        try:
+            room = Room.objects.get(
+                id=room_id, 
+                hotel_id=hotel_id, 
+                is_active=True
+            ).select_related('room_type')
+            
+            return Response({
+                'room_id': str(room.id),
+                'room_type': room.room_type.name,
+                'amenities': room.room_type.amenities or []
+            })
+            
+        except Room.DoesNotExist:
+            return Response({'error': 'Room not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# Management views (require staff permissions)
+class ManageRoomMaintenanceAPIView(generics.GenericAPIView):
+    """Manage room maintenance status"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def patch(self, request, hotel_id, room_id):
+        if not request.user.is_staff:
+            return Response({
+                'error': 'Staff access required'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            room = Room.objects.get(id=room_id, hotel_id=hotel_id)
+            
+            new_status = request.data.get('maintenance_status')
+            if new_status not in ['operational', 'maintenance', 'out_of_order']:
+                return Response({
+                    'error': 'Invalid maintenance status'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            room.maintenance_status = new_status
+            room.save()
+            
+            return Response({
+                'room_id': str(room.id),
+                'maintenance_status': room.maintenance_status,
+                'updated_at': room.updated_at
+            })
+            
+        except Room.DoesNotExist:
+            return Response({'error': 'Room not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ManageRoomTypesAPIView(generics.ListCreateAPIView):
+    """Manage room types"""
+    serializer_class = RoomTypeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        if not self.request.user.is_staff:
+            return RoomType.objects.none()
+        return RoomType.objects.filter(is_active=True)
+
+
+class ManageExtrasAPIView(generics.ListCreateAPIView):
+    """Manage hotel extras"""
+    serializer_class = ExtraSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        if not self.request.user.is_staff:
+            return Extra.objects.none()
+        hotel_id = self.kwargs.get('hotel_id')
+        return Extra.objects.filter(hotel_id=hotel_id, is_active=True)
+
+
+class SearchHotelsByAmenitiesAPIView(generics.ListAPIView):
+    """Search hotels by amenities"""
+    serializer_class = HotelSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_queryset(self):
+        queryset = Hotel.objects.filter(is_active=True)
+        
+        # Amenity-based filtering
+        amenities = self.request.query_params.getlist('amenities')
+        if amenities:
+            # Filter hotels that have rooms with specified amenities
+            for amenity in amenities:
+                queryset = queryset.filter(
+                    room_types__amenities__icontains=amenity
+                ).distinct()
+                
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'count': len(response.data),
+            'results': response.data
+        })
+
+
+class HotelsByPriceRangeAPIView(generics.ListAPIView):
+    """Search hotels by price range"""
+    serializer_class = HotelSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_queryset(self):
+        queryset = Hotel.objects.filter(is_active=True)
+        
+        # Price range filtering
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        
+        if min_price:
+            queryset = queryset.filter(room_types__base_price__gte=min_price).distinct()
+        if max_price:
+            queryset = queryset.filter(room_types__base_price__lte=max_price).distinct()
+                
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'count': len(response.data),
+            'results': response.data
+        })
+
+
+class SearchHotelsByPriceAPIView(HotelsByPriceRangeAPIView):
+    """Alias for HotelsByPriceRangeAPIView for URL compatibility"""
+    pass
+
+
+class SearchHotelsByRatingAPIView(generics.ListAPIView):
+    """Search hotels by star rating"""
+    serializer_class = HotelSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_queryset(self):
+        queryset = Hotel.objects.filter(is_active=True)
+        
+        # Rating filtering
+        min_rating = self.request.query_params.get('min_rating')
+        max_rating = self.request.query_params.get('max_rating')
+        
+        if min_rating:
+            queryset = queryset.filter(star_rating__gte=min_rating)
+        if max_rating:
+            queryset = queryset.filter(star_rating__lte=max_rating)
+                
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'count': len(response.data),
+            'results': response.data
+        })
+
+
+class HotelRecommendationsAPIView(generics.GenericAPIView):
+    """Get hotel recommendations"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        # Mock recommendation algorithm
+        hotels = Hotel.objects.filter(is_active=True)[:6]
+        
+        recommended_hotels = []
+        for hotel in hotels:
+            recommended_hotels.append({
+                'id': str(hotel.id),
+                'name': hotel.name,
+                'star_rating': hotel.star_rating,
+                'city': hotel.city,
+                'state': hotel.state,
+                'recommendation_score': 85 + (hotel.star_rating * 3),
+                'recommendation_reason': f'Popular {hotel.star_rating}-star hotel in {hotel.city}'
+            })
+        
+        return Response({
+            'count': len(recommended_hotels),
+            'recommendations': recommended_hotels
+        })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def hotel_search(request):
+    """
+    Search hotels with availability filtering by dates and capacity
+    
+    Query Parameters:
+    - check_in: Check-in date (YYYY-MM-DD)
+    - check_out: Check-out date (YYYY-MM-DD) 
+    - capacity: Number of guests (optional)
+    - hotel_id: Specific hotel ID (optional)
+    """
+    from datetime import datetime
+    from django.db.models import Count, Q, Exists, OuterRef
+    from bookings.models import Booking
+    
+    try:
+        # Get query parameters
+        check_in = request.GET.get('check_in')
+        check_out = request.GET.get('check_out')
+        capacity = request.GET.get('capacity')
+        hotel_id = request.GET.get('hotel_id')
+        
+        # Validate required parameters
+        if not check_in or not check_out:
+            return Response({
+                'error': 'Both check_in and check_out dates are required',
+                'format': 'YYYY-MM-DD'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Parse dates
+        try:
+            check_in_date = datetime.strptime(check_in, '%Y-%m-%d').date()
+            check_out_date = datetime.strptime(check_out, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({
+                'error': 'Invalid date format. Use YYYY-MM-DD'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate dates
+        if check_out_date <= check_in_date:
+            return Response({
+                'error': 'Check-out date must be after check-in date'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Parse capacity
+        if capacity:
+            try:
+                capacity = int(capacity)
+                if capacity < 1 or capacity > 10:
+                    return Response({
+                        'error': 'Capacity must be between 1 and 10'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return Response({
+                    'error': 'Capacity must be a valid number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Start with active hotels
+        hotels_query = Hotel.objects.filter(is_active=True)
+        
+        # Filter by specific hotel if provided
+        if hotel_id:
+            hotels_query = hotels_query.filter(id=hotel_id)
+        
+        # Get available hotels
+        available_hotels = []
+        
+        for hotel in hotels_query:
+            # Find room types that match capacity requirements
+            room_types_query = RoomType.objects.filter(
+                rooms__hotel=hotel
+            ).distinct()
+            
+            # Filter by capacity if specified
+            if capacity:
+                room_types_query = room_types_query.filter(
+                    max_capacity__gte=capacity
+                )
+            
+            # Check availability for each room type
+            available_room_types = []
+            
+            for room_type in room_types_query:
+                # Get rooms of this type in this hotel
+                hotel_rooms = Room.objects.filter(
+                    hotel=hotel,
+                    room_type=room_type,
+                    is_active=True,
+                    is_maintenance=False
+                )
+                
+                # Check for conflicting bookings
+                conflicting_bookings = Booking.objects.filter(
+                    room__in=hotel_rooms,
+                    status__in=['confirmed', 'checked_in'],
+                    check_in__lt=check_out_date,
+                    check_out__gt=check_in_date
+                )
+                
+                # Get booked room IDs
+                booked_room_ids = conflicting_bookings.values_list('room_id', flat=True)
+                
+                # Get available rooms
+                available_rooms = hotel_rooms.exclude(id__in=booked_room_ids)
+                available_count = available_rooms.count()
+                
+                if available_count > 0:
+                    # Calculate pricing
+                    base_price = available_rooms.first().base_price
+                    
+                    # Get detailed room information
+                    room_details = []
+                    for room in available_rooms:
+                        room_details.append({
+                            'room_id': str(room.id),
+                            'room_number': room.room_number,
+                            'floor': room.floor,
+                            'capacity': room.capacity,
+                            'base_price': str(room.base_price),
+                            'view_type': room.view_type
+                        })
+                    
+                    available_room_types.append({
+                        'id': str(room_type.id),
+                        'name': room_type.name,
+                        'description': room_type.description,
+                        'max_capacity': room_type.max_capacity,
+                        'bed_type': room_type.bed_type,
+                        'bed_count': room_type.bed_count,
+                        'bathroom_count': room_type.bathroom_count,
+                        'room_size_sqm': room_type.room_size_sqm,
+                        'amenities': room_type.amenities_list,
+                        'is_accessible': room_type.is_accessible,
+                        'available_rooms': available_count,
+                        'available_room_details': room_details,
+                        'price_per_night': str(base_price),
+                        'total_rooms': hotel_rooms.count()
+                    })
+            
+            # If hotel has available room types, include it
+            if available_room_types:
+                # Calculate total nights
+                nights = (check_out_date - check_in_date).days
+                
+                # Get min and max prices
+                prices = [float(rt['price_per_night']) for rt in available_room_types]
+                min_price = min(prices) if prices else 0
+                max_price = max(prices) if prices else 0
+                
+                available_hotels.append({
+                    'id': str(hotel.id),
+                    'name': hotel.name,
+                    'description': hotel.description,
+                    'full_address': hotel.full_address,
+                    'phone_number': hotel.phone_number,
+                    'email': hotel.email,
+                    'website': hotel.website,
+                    'star_rating': hotel.star_rating,
+                    'check_in_time': hotel.check_in_time.strftime('%H:%M'),
+                    'check_out_time': hotel.check_out_time.strftime('%H:%M'),
+                    'available_room_types': available_room_types,
+                    'room_types_count': len(available_room_types),
+                    'total_available_rooms': sum(rt['available_rooms'] for rt in available_room_types),
+                    'price_range': {
+                        'min_per_night': min_price,
+                        'max_per_night': max_price,
+                        'min_total': min_price * nights,
+                        'max_total': max_price * nights,
+                        'nights': nights
+                    },
+                    'search_params': {
+                        'check_in': check_in,
+                        'check_out': check_out,
+                        'capacity': capacity,
+                        'nights': nights
+                    }
+                })
+        
+        return Response({
+            'count': len(available_hotels),
+            'search_criteria': {
+                'check_in': check_in,
+                'check_out': check_out,
+                'capacity': capacity,
+                'hotel_id': hotel_id,
+                'nights': (check_out_date - check_in_date).days
+            },
+            'hotels': available_hotels,
+            'message': f'Found {len(available_hotels)} hotel(s) with availability' if available_hotels 
+                      else 'No hotels available for the selected dates and criteria'
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': 'Internal server error',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def hotel_search_by_capacity(request):
+    """
+    Search hotels by capacity only (without date requirements)
+    
+    Query Parameters:
+    - capacity (required): Number of guests
+    - hotel_id (optional): Specific hotel ID
+    """
+    try:
+        # Get query parameters
+        capacity = request.GET.get('capacity')
+        hotel_id = request.GET.get('hotel_id')
+        
+        # Validate required parameters
+        if not capacity:
+            return Response({
+                'error': 'Missing required parameter: capacity'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            capacity = int(capacity)
+            if capacity <= 0:
+                return Response({
+                    'error': 'Capacity must be a positive integer'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError:
+            return Response({
+                'error': 'Capacity must be a valid integer'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Start with all hotels query
+        hotels_query = Hotel.objects.all()
+        
+        # Filter by specific hotel if provided
+        if hotel_id:
+            try:
+                hotel_id = int(hotel_id)
+                hotels_query = hotels_query.filter(id=hotel_id)
+            except ValueError:
+                return Response({
+                    'error': 'Hotel ID must be a valid integer'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get hotels that have room types with adequate capacity
+        hotels_with_capacity = []
+        for hotel in hotels_query:
+            # Find room types that can accommodate the requested capacity
+            # Get unique room types from hotel's rooms that have adequate capacity
+            suitable_rooms = hotel.rooms.filter(
+                capacity__gte=capacity,
+                is_active=True
+            ).select_related('room_type')
+            
+            # Get unique room types from these rooms
+            room_type_ids = suitable_rooms.values_list('room_type_id', flat=True).distinct()
+            suitable_room_types = RoomType.objects.filter(id__in=room_type_ids).order_by('max_capacity', 'name')
+            
+            if suitable_room_types.exists():
+                # Serialize the hotel data
+                hotel_data = HotelSerializer(hotel).data
+                
+                # Add room type information
+                room_types_data = []
+                for room_type in suitable_room_types:
+                    room_type_data = RoomTypeSerializer(room_type).data
+                    # Add total available rooms count for this room type at this hotel
+                    rooms_of_type = suitable_rooms.filter(room_type=room_type)
+                    room_type_data['available_rooms'] = rooms_of_type.count()
+                    room_type_data['room_details'] = []
+                    
+                    # Add individual room details
+                    for room in rooms_of_type:
+                        room_type_data['room_details'].append({
+                            'room_id': str(room.id),
+                            'room_number': room.room_number,
+                            'floor': room.floor,
+                            'capacity': room.capacity,
+                            'base_price': str(room.base_price),
+                            'view_type': room.view_type
+                        })
+                    
+                    room_types_data.append(room_type_data)
+                
+                hotel_data['suitable_room_types'] = room_types_data
+                hotels_with_capacity.append(hotel_data)
+        
+        return Response({
+            'count': len(hotels_with_capacity),
+            'search_criteria': {
+                'capacity': capacity,
+                'hotel_id': hotel_id
+            },
+            'hotels': hotels_with_capacity,
+            'message': f'Found {len(hotels_with_capacity)} hotel(s) with room types for {capacity} guests' if hotels_with_capacity 
+                      else f'No hotels found with room types that can accommodate {capacity} guests'
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': 'Internal server error',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

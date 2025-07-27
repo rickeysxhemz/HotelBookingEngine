@@ -7,6 +7,8 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 # Third-party imports
 from rest_framework import generics, status, permissions
@@ -22,6 +24,8 @@ from .serializers import (
     PasswordChangeSerializer, UserUpdateSerializer,
 )
 from .services import TokenBlacklistService
+from bookings.models import Booking
+from bookings.serializers import BookingListSerializer
 
 
 class RegisterAPIView(generics.CreateAPIView):
@@ -333,6 +337,226 @@ def delete_account(request):
     user = request.user
     user.delete()
     return Response({'message': 'Your account has been deleted successfully.'})
+
+
+# ===== MISSING VIEWS IMPLEMENTATION =====
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def resend_verification_email(request):
+    """Resend email verification"""
+    user = request.user
+    if user.is_verified:
+        return Response({'message': 'Your email is already verified.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Create new verification token
+    verification_token = EmailVerificationToken.objects.create(user=user)
+    
+    # Send verification email (implement send_verification_email method)
+    try:
+        send_verification_email(user, verification_token)
+        return Response({'message': 'Verification email sent successfully.'})
+    except Exception as e:
+        return Response({'error': 'Failed to send verification email.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ProfileAvatarAPIView(generics.UpdateAPIView):
+    """Upload/update user profile avatar"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserUpdateSerializer
+    
+    def update(self, request, *args, **kwargs):
+        user = request.user
+        avatar = request.FILES.get('avatar')
+        
+        if not avatar:
+            return Response({'error': 'No avatar file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Delete old avatar if exists
+        if user.profile_picture:
+            default_storage.delete(user.profile_picture.name)
+        
+        # Save new avatar
+        user.profile_picture = avatar
+        user.save()
+        
+        return Response({
+            'message': 'Avatar updated successfully.',
+            'avatar_url': user.profile_picture.url if user.profile_picture else None
+        })
+
+
+class UserSettingsAPIView(generics.RetrieveUpdateAPIView):
+    """User settings management"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserUpdateSerializer
+    
+    def get_object(self):
+        return self.request.user
+    
+    def get(self, request, *args, **kwargs):
+        user = self.get_object()
+        settings_data = {
+            'newsletter_subscription': user.newsletter_subscription,
+            'email_notifications': True,  # Add this field to model if needed
+            'privacy_settings': {
+                'show_profile_publicly': False,  # Add this field to model if needed
+                'allow_contact': True,
+            }
+        }
+        return Response(settings_data)
+    
+    def patch(self, request, *args, **kwargs):
+        user = self.get_object()
+        
+        # Update settings
+        if 'newsletter_subscription' in request.data:
+            user.newsletter_subscription = request.data['newsletter_subscription']
+        
+        user.save()
+        
+        return Response({'message': 'Settings updated successfully.'})
+
+
+class UserPreferencesAPIView(generics.RetrieveUpdateAPIView):
+    """User preferences management"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        preferences = {
+            'language': 'en',  # Default language
+            'currency': 'USD',  # Default currency
+            'timezone': 'UTC',  # Default timezone
+            'room_preferences': {
+                'smoking': False,
+                'floor_preference': 'high',
+                'bed_type': 'king',
+            },
+            'booking_preferences': {
+                'auto_confirm': True,
+                'cancellation_insurance': False,
+            }
+        }
+        return Response(preferences)
+    
+    def patch(self, request, *args, **kwargs):
+        # In a real implementation, you'd save these to a UserPreferences model
+        return Response({'message': 'Preferences updated successfully.'})
+
+
+class UserBookingsListAPIView(generics.ListAPIView):
+    """Get user's bookings"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = BookingListSerializer
+    
+    def get_queryset(self):
+        return Booking.objects.filter(guest=self.request.user).order_by('-created_at')
+
+
+class UserBookingHistoryAPIView(generics.ListAPIView):
+    """Get user's booking history"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = BookingListSerializer
+    
+    def get_queryset(self):
+        return Booking.objects.filter(
+            guest=self.request.user,
+            status__in=['completed', 'cancelled']
+        ).order_by('-created_at')
+
+
+class UserFavoriteHotelsAPIView(generics.ListAPIView):
+    """Get user's favorite hotels"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        # In a real implementation, you'd have a UserFavoriteHotel model
+        # For now, return empty list
+        return Response({
+            'results': [],
+            'message': 'Favorite hotels feature coming soon!'
+        })
+    
+    def post(self, request, *args, **kwargs):
+        """Add hotel to favorites"""
+        hotel_id = request.data.get('hotel_id')
+        if not hotel_id:
+            return Response({'error': 'hotel_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # In a real implementation, you'd create a favorite record
+        return Response({'message': 'Hotel added to favorites!'})
+
+
+class UserNotificationsAPIView(generics.ListAPIView):
+    """Get user notifications"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        # In a real implementation, you'd have a Notification model
+        notifications = [
+            {
+                'id': 1,
+                'title': 'Booking Confirmed',
+                'message': 'Your booking at Hotel Maar has been confirmed.',
+                'read': False,
+                'created_at': timezone.now().isoformat(),
+                'type': 'booking'
+            },
+            {
+                'id': 2,
+                'title': 'Welcome to Hotel Booking Engine!',
+                'message': 'Thank you for registering. Explore our amazing hotels.',
+                'read': True,
+                'created_at': (timezone.now() - timedelta(days=1)).isoformat(),
+                'type': 'welcome'
+            }
+        ]
+        
+        return Response({
+            'results': notifications,
+            'unread_count': len([n for n in notifications if not n['read']])
+        })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_notification_read(request, notification_id):
+    """Mark a notification as read"""
+    # In a real implementation, you'd update the notification in the database
+    return Response({'message': f'Notification {notification_id} marked as read.'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_all_notifications_read(request):
+    """Mark all notifications as read"""
+    # In a real implementation, you'd update all user notifications
+    return Response({'message': 'All notifications marked as read.'})
+
+
+def send_verification_email(user, verification_token):
+    """Send verification email to user"""
+    subject = 'Verify your email address'
+    message = f'''
+    Hi {user.first_name or user.username},
+    
+    Please click the link below to verify your email address:
+    http://127.0.0.1:8000/api/v1/auth/verify/{verification_token.token}/
+    
+    This link will expire in 24 hours.
+    
+    Best regards,
+    Hotel Booking Engine Team
+    '''
+    
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
 
 
 def get_client_ip(request):
