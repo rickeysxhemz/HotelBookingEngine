@@ -14,7 +14,6 @@ PyJWT==2.8.0
 
 # API Documentation
 drf-yasg==1.21.7
-drf-spectacular==0.27.0
 swagger-spec-validator==3.0.3
 PyYAML==6.0.2
 uritemplate==4.2.0
