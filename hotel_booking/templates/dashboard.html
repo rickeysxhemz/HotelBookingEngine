@@ -386,6 +386,128 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="row mt-3">
+                            <!-- Flexible Hotel Search with Adults & Children -->
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #f39c12, #e67e22);">
+                                        <span class="method-badge method-get">GET</span>
+                                        <strong>/hotels/search-flexible/</strong>
+                                        <small class="ms-2">🚀 Advanced Search</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <h6 class="mb-3">
+                                            <i class="fas fa-user-friends me-2"></i>
+                                            Flexible Hotel Search (Adults & Children)
+                                        </h6>
+                                        <p class="text-muted mb-3">
+                                            Advanced search with support for adults/children combinations and optional dates.
+                                        </p>
+                                        <form id="hotelFlexibleSearchForm">
+                                            <div class="row">
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Check-in Date (Optional)</label>
+                                                    <input type="date" class="form-control" name="check_in" id="flexibleCheckIn">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Check-out Date (Optional)</label>
+                                                    <input type="date" class="form-control" name="check_out" id="flexibleCheckOut">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Adults</label>
+                                                    <select class="form-select" name="adults" id="flexibleAdults">
+                                                        <option value="">Default (1)</option>
+                                                        <option value="0">0</option>
+                                                        <option value="1" selected>1</option>
+                                                        <option value="2">2</option>
+                                                        <option value="3">3</option>
+                                                        <option value="4">4</option>
+                                                        <option value="5">5</option>
+                                                        <option value="6">6</option>
+                                                        <option value="7">7</option>
+                                                        <option value="8">8</option>
+                                                        <option value="9">9</option>
+                                                        <option value="10">10</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Children</label>
+                                                    <select class="form-select" name="children" id="flexibleChildren">
+                                                        <option value="">Default (0)</option>
+                                                        <option value="0" selected>0</option>
+                                                        <option value="1">1</option>
+                                                        <option value="2">2</option>
+                                                        <option value="3">3</option>
+                                                        <option value="4">4</option>
+                                                        <option value="5">5</option>
+                                                        <option value="6">6</option>
+                                                        <option value="7">7</option>
+                                                        <option value="8">8</option>
+                                                        <option value="9">9</option>
+                                                        <option value="10">10</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Or Total Capacity</label>
+                                                    <select class="form-select" name="capacity" id="flexibleCapacity">
+                                                        <option value="">Use Adults+Children</option>
+                                                        <option value="1">1 Guest</option>
+                                                        <option value="2">2 Guests</option>
+                                                        <option value="3">3 Guests</option>
+                                                        <option value="4">4 Guests</option>
+                                                        <option value="5">5 Guests</option>
+                                                        <option value="6">6 Guests</option>
+                                                        <option value="7">7 Guests</option>
+                                                        <option value="8">8 Guests</option>
+                                                        <option value="9">9 Guests</option>
+                                                        <option value="10">10 Guests</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="row mt-3">
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Hotel ID (Optional)</label>
+                                                    <input type="text" class="form-control" name="hotel_id" placeholder="Specific hotel ID">
+                                                </div>
+                                                <div class="col-md-3 d-flex align-items-end">
+                                                    <button type="submit" class="btn w-100" style="background: linear-gradient(135deg, #f39c12, #e67e22); border: none; color: white;">
+                                                        <i class="fas fa-search me-2"></i>Flexible Search
+                                                    </button>
+                                                </div>
+                                                <div class="col-md-2 d-flex align-items-end">
+                                                    <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFlexibleSearch()">
+                                                        <i class="fas fa-eraser"></i> Clear
+                                                    </button>
+                                                </div>
+                                                <div class="col-md-3 d-flex align-items-end">
+                                                    <button type="button" class="btn btn-outline-info w-100" onclick="showFlexibleSearchExamples()">
+                                                        <i class="fas fa-lightbulb"></i> Examples
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                        
+                                        <!-- Examples Section (initially hidden) -->
+                                        <div id="flexibleSearchExamples" class="mt-3" style="display: none;">
+                                            <div class="alert alert-info">
+                                                <h6><i class="fas fa-info-circle me-2"></i>Example Searches:</h6>
+                                                <ul class="mb-0">
+                                                    <li><strong>2 Adults + 1 Child:</strong> Adults: 2, Children: 1</li>
+                                                    <li><strong>Family of 4:</strong> Adults: 2, Children: 2</li>
+                                                    <li><strong>Solo Traveler:</strong> Adults: 1, Children: 0</li>
+                                                    <li><strong>Children Only:</strong> Adults: 0, Children: 3</li>
+                                                    <li><strong>Total Capacity:</strong> Leave adults/children empty, set Total Capacity: 5</li>
+                                                    <li><strong>Without Dates:</strong> Leave check-in/out empty for availability without date constraints</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        
+                                        <div id="hotelFlexibleSearchResponse" class="response-container mt-3" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -760,6 +882,65 @@
         document.getElementById('hotelCapacitySearchResponse').style.display = 'none';
         document.getElementById('hotelCapacitySearchResponse').innerHTML = '';
         showToast('Capacity search cleared', 'info');
+    }
+
+    // Flexible Hotel Search with Adults & Children
+    document.getElementById('hotelFlexibleSearchForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const params = new URLSearchParams();
+        
+        // Add all form data to URL parameters
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                params.append(key, value);
+            }
+        }
+        
+        const url = `${apiBaseUrl}/hotels/search-flexible/?${params.toString()}`;
+        const response = await makeApiRequest('GET', url, null, false);
+        trackRequest(response.ok);
+        
+        updateResponseDisplay('hotelFlexibleSearchResponse', response);
+        document.getElementById('hotelFlexibleSearchResponse').style.display = 'block';
+        
+        // Show summary toast
+        if (response.ok) {
+            const count = response.data.count || 0;
+            const criteria = response.data.search_criteria || {};
+            const adults = criteria.adults || 0;
+            const children = criteria.children || 0;
+            const totalGuests = criteria.total_guests || 0;
+            const datesProvided = criteria.dates_provided || false;
+            
+            let message = `Found ${count} hotel(s) for ${adults} adult(s) and ${children} child(ren) (Total: ${totalGuests})`;
+            if (datesProvided) {
+                message += ` with dates`;
+            }
+            showToast(message, 'success');
+        }
+    });
+
+    // Clear Flexible Search
+    function clearFlexibleSearch() {
+        document.getElementById('hotelFlexibleSearchForm').reset();
+        document.getElementById('hotelFlexibleSearchResponse').style.display = 'none';
+        document.getElementById('hotelFlexibleSearchResponse').innerHTML = '';
+        document.getElementById('flexibleSearchExamples').style.display = 'none';
+        showToast('Flexible search cleared', 'info');
+    }
+
+    // Show/Hide Flexible Search Examples
+    function showFlexibleSearchExamples() {
+        const examplesDiv = document.getElementById('flexibleSearchExamples');
+        if (examplesDiv.style.display === 'none') {
+            examplesDiv.style.display = 'block';
+            showToast('Examples shown', 'info');
+        } else {
+            examplesDiv.style.display = 'none';
+            showToast('Examples hidden', 'info');
+        }
     }
 
     // List Bookings
