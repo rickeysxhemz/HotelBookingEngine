@@ -15,30 +15,125 @@ from core.services import (
 
 
 class RoomTypeSerializer(serializers.ModelSerializer):
-    """Serializer for room type information"""
+    """Comprehensive serializer for room type information"""
     amenities = serializers.SerializerMethodField()
+    room_features = serializers.SerializerMethodField()
+    policies = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
     
     class Meta:
         model = RoomType
         fields = [
-            'id', 'name', 'description', 'max_capacity', 'bed_type', 'bed_count',
-            'bathroom_count', 'room_size_sqm', 'amenities', 'is_accessible'
+            'id', 'name', 'category', 'short_description', 'description', 
+            'max_capacity', 'bed_type', 'bed_count', 'bathroom_count', 
+            'room_size_sqm', 'room_size_sqft', 'is_accessible',
+            'amenities', 'room_features', 'policies', 'images'
         ]
     
     def get_amenities(self, obj):
+        """Get basic amenities list"""
         return obj.amenities_list
+    
+    def get_room_features(self, obj):
+        """Get comprehensive room features"""
+        return {
+            # Technology & Entertainment
+            'technology': {
+                'wifi': obj.has_wifi,
+                'smart_tv': obj.has_smart_tv,
+                'regular_tv': obj.has_tv,
+                'streaming_service': obj.has_streaming_service,
+                'bluetooth_speaker': obj.has_bluetooth_speaker,
+                'usb_charging': obj.has_usb_charging,
+                'phone': obj.has_phone,
+            },
+            # Comfort & Convenience
+            'comfort': {
+                'air_conditioning': obj.has_air_conditioning,
+                'heating': obj.has_heating,
+                'desk': obj.has_desk,
+                'seating_area': obj.has_seating_area,
+                'balcony': obj.has_balcony,
+                'safe': obj.has_safe,
+                'blackout_curtains': obj.has_blackout_curtains,
+                'soundproofing': obj.has_soundproofing,
+            },
+            # Kitchen & Dining
+            'kitchen': {
+                'kitchenette': obj.has_kitchenette,
+                'coffee_maker': obj.has_coffee_maker,
+                'tea_kettle': obj.has_tea_kettle,
+                'refrigerator': obj.has_refrigerator,
+                'microwave': obj.has_microwave,
+                'minibar': obj.has_minibar,
+            },
+            # Bathroom Features
+            'bathroom': {
+                'shower': obj.has_shower,
+                'bathtub': obj.has_bathtub,
+                'hairdryer': obj.has_hairdryer,
+                'toiletries': obj.has_toiletries,
+                'towels': obj.has_towels,
+                'bathrobes': obj.has_bathrobes,
+                'slippers': obj.has_slippers,
+            },
+            # Additional Services
+            'services': {
+                'iron': obj.has_iron,
+                'ironing_board': obj.has_ironing_board,
+            }
+        }
+    
+    def get_policies(self, obj):
+        """Get room policies"""
+        return {
+            'children': {
+                'allowed': obj.children_allowed,
+                'max_children': obj.max_children,
+            },
+            'beds': {
+                'extra_bed_available': obj.extra_bed_available,
+                'extra_bed_charge': float(obj.extra_bed_charge) if obj.extra_bed_charge else 0,
+                'infant_bed_available': obj.infant_bed_available,
+            },
+            'check_in_out': {
+                'early_checkin_available': obj.early_checkin_available,
+                'early_checkin_charge': float(obj.early_checkin_charge) if obj.early_checkin_charge else 0,
+                'late_checkout_available': obj.late_checkout_available,
+                'late_checkout_charge': float(obj.late_checkout_charge) if obj.late_checkout_charge else 0,
+            }
+        }
+    
+    def get_images(self, obj):
+        """Get room type images"""
+        from core.models import RoomImage
+        images = RoomImage.objects.filter(room_type=obj, is_active=True).order_by('display_order')
+        return [{
+            'id': str(img.id),
+            'image_url': img.image_url,
+            'alt_text': img.image_alt_text,
+            'caption': img.caption,
+            'image_type': img.image_type,
+            'is_primary': img.is_primary,
+            'display_order': img.display_order
+        } for img in images]
 
 
 class RoomSerializer(serializers.ModelSerializer):
-    """Serializer for room information"""
+    """Comprehensive serializer for room information"""
     room_type = RoomTypeSerializer(read_only=True)
     price_for_dates = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+    room_status = serializers.SerializerMethodField()
+    room_features = serializers.SerializerMethodField()
     
     class Meta:
         model = Room
         fields = [
             'id', 'room_number', 'floor', 'capacity', 'base_price', 
-            'view_type', 'room_type', 'price_for_dates'
+            'view_type', 'condition', 'housekeeping_status', 'last_renovated',
+            'is_corner_room', 'is_connecting_room', 'special_features',
+            'room_type', 'price_for_dates', 'images', 'room_status', 'room_features'
         ]
     
     def get_price_for_dates(self, obj):
@@ -58,6 +153,59 @@ class RoomSerializer(serializers.ModelSerializer):
                     pass
         
         return None
+    
+    def get_images(self, obj):
+        """Get room images - both room-specific and room type images"""
+        from core.models import RoomImage
+        
+        # Get room-specific images first
+        room_images = RoomImage.objects.filter(room=obj, is_active=True).order_by('display_order')
+        
+        # If no room-specific images, get room type images
+        if not room_images.exists():
+            room_images = RoomImage.objects.filter(room_type=obj.room_type, is_active=True).order_by('display_order')
+        
+        return [{
+            'id': str(img.id),
+            'image_url': img.image_url,
+            'alt_text': img.image_alt_text,
+            'caption': img.caption,
+            'image_type': img.image_type,
+            'is_primary': img.is_primary,
+            'display_order': img.display_order
+        } for img in room_images]
+    
+    def get_room_status(self, obj):
+        """Get comprehensive room status"""
+        return {
+            'is_active': obj.is_active,
+            'is_maintenance': obj.is_maintenance,
+            'condition': obj.condition,
+            'housekeeping_status': obj.housekeeping_status,
+            'last_renovated': obj.last_renovated.isoformat() if obj.last_renovated else None,
+            'last_cleaned': obj.last_cleaned.isoformat() if obj.last_cleaned else None,
+            'last_inspected': obj.last_inspected.isoformat() if obj.last_inspected else None,
+            'maintenance_notes': obj.maintenance_notes,
+            'needs_maintenance': obj.needs_maintenance,
+            'maintenance_priority': obj.maintenance_priority,
+        }
+    
+    def get_room_features(self, obj):
+        """Get room-specific features"""
+        return {
+            'location': {
+                'floor': obj.floor,
+                'is_corner_room': obj.is_corner_room,
+                'is_connecting_room': obj.is_connecting_room,
+                'view_type': obj.view_type,
+            },
+            'special_features': obj.special_features,
+            'capacity': obj.capacity,
+            'room_size': {
+                'sqm': obj.room_type.room_size_sqm,
+                'sqft': obj.room_type.room_size_sqft,
+            }
+        }
 
 
 class ExtraSerializer(serializers.ModelSerializer):

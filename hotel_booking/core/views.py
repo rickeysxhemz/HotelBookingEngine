@@ -12,25 +12,27 @@ from rest_framework.response import Response
 from .models import Hotel, Room, RoomType, Extra
 from .services import HotelSearchService, RoomAvailabilityService
 from bookings.serializers import (
-    RoomSerializer, ExtraSerializer, RoomAvailabilitySerializer
+    RoomSerializer, RoomTypeSerializer, ExtraSerializer, RoomAvailabilitySerializer
 )
 
 
 class HotelSerializer(serializers.ModelSerializer):
-    """Serializer for hotel information"""
+    """Comprehensive serializer for hotel information"""
     room_types = serializers.SerializerMethodField()
     amenities_count = serializers.SerializerMethodField()
+    room_stats = serializers.SerializerMethodField()
+    available_amenities = serializers.SerializerMethodField()
     
     class Meta:
         model = Hotel
         fields = [
             'id', 'name', 'description', 'full_address', 'phone_number',
             'email', 'website', 'star_rating', 'check_in_time', 'check_out_time',
-            'room_types', 'amenities_count'
+            'room_types', 'amenities_count', 'room_stats', 'available_amenities'
         ]
     
     def get_room_types(self, obj):
-        """Get available room types for this hotel"""
+        """Get comprehensive room types for this hotel"""
         room_types = RoomType.objects.filter(
             rooms__hotel=obj
         ).distinct()
@@ -39,21 +41,77 @@ class HotelSerializer(serializers.ModelSerializer):
     def get_amenities_count(self, obj):
         """Get count of available amenities/extras"""
         return obj.extras.filter(is_active=True).count()
+    
+    def get_room_stats(self, obj):
+        """Get comprehensive room statistics"""
+        rooms = obj.rooms.filter(is_active=True)
+        return {
+            'total_rooms': rooms.count(),
+            'available_rooms': rooms.filter(is_maintenance=False).count(),
+            'room_types_count': rooms.values('room_type').distinct().count(),
+            'floors': rooms.values_list('floor', flat=True).distinct().count(),
+            'corner_rooms': rooms.filter(is_corner_room=True).count(),
+            'accessible_rooms': rooms.filter(room_type__is_accessible=True).count(),
+            'rooms_with_balcony': rooms.filter(room_type__has_balcony=True).count(),
+            'suite_rooms': rooms.filter(room_type__category__in=['suite', 'presidential']).count(),
+        }
+    
+    def get_available_amenities(self, obj):
+        """Get list of available amenities and room features"""
+        from core.models import RoomAmenity
+        room_amenities = RoomAmenity.objects.filter(
+            roomtypeamenity__room_type__rooms__hotel=obj
+        ).distinct()
+        
+        return {
+            'hotel_amenities': [
+                {
+                    'id': str(extra.id),
+                    'name': extra.name,
+                    'description': extra.description,
+                    'category': extra.category
+                } for extra in obj.extras.filter(is_active=True)
+            ],
+            'room_amenities': [
+                {
+                    'id': str(amenity.id),
+                    'name': amenity.name,
+                    'description': amenity.description,
+                    'category': amenity.category,
+                    'is_premium': amenity.is_premium
+                } for amenity in room_amenities
+            ]
+        }
 
 
 class RoomTypeSerializer(serializers.ModelSerializer):
     """Serializer for room type information"""
     amenities = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
     
     class Meta:
         model = RoomType
         fields = [
             'id', 'name', 'description', 'max_capacity', 'bed_type', 'bed_count',
-            'bathroom_count', 'room_size_sqm', 'amenities', 'is_accessible'
+            'bathroom_count', 'room_size_sqm', 'amenities', 'is_accessible', 'images'
         ]
     
     def get_amenities(self, obj):
         return obj.amenities_list
+    
+    def get_images(self, obj):
+        """Get room type images"""
+        from core.models import RoomImage
+        images = RoomImage.objects.filter(room_type=obj, is_active=True).order_by('display_order')
+        return [{
+            'id': str(img.id),
+            'image_url': img.image_url,
+            'alt_text': img.image_alt_text,
+            'caption': img.caption,
+            'image_type': img.image_type,
+            'is_primary': img.is_primary,
+            'display_order': img.display_order
+        } for img in images]
 
 
 class HotelListAPIView(generics.ListAPIView):
