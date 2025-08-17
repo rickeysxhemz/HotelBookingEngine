@@ -1529,3 +1529,252 @@ def hotel_search_by_capacity(request):
             'error': 'Internal server error',
             'detail': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def hotel_search_flexible(request):
+    """
+    Flexible hotel search with adults and children support
+    
+    Query Parameters:
+    - check_in: Check-in date (YYYY-MM-DD) - optional
+    - check_out: Check-out date (YYYY-MM-DD) - optional  
+    - adults: Number of adults (optional, default: 1)
+    - children: Number of children (optional, default: 0)
+    - capacity: Total number of guests (optional, alternative to adults/children)
+    - hotel_id: Specific hotel ID (optional)
+    """
+    from datetime import datetime
+    from django.db.models import Count, Q, Exists, OuterRef
+    from bookings.models import Booking
+    
+    try:
+        # Get query parameters
+        check_in = request.GET.get('check_in')
+        check_out = request.GET.get('check_out')
+        adults = request.GET.get('adults')
+        children = request.GET.get('children')
+        capacity = request.GET.get('capacity')
+        hotel_id = request.GET.get('hotel_id')
+        
+        # Parse adults and children
+        adults_count = 1  # Default to 1 adult
+        children_count = 0  # Default to 0 children
+        
+        if adults:
+            try:
+                adults_count = int(adults)
+                if adults_count < 0 or adults_count > 10:
+                    return Response({
+                        'error': 'Adults must be between 0 and 10'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return Response({
+                    'error': 'Adults must be a valid number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if children:
+            try:
+                children_count = int(children)
+                if children_count < 0 or children_count > 10:
+                    return Response({
+                        'error': 'Children must be between 0 and 10'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return Response({
+                    'error': 'Children must be a valid number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculate total guests (adults + children, with capacity override)
+        if capacity:
+            try:
+                total_guests = int(capacity)
+                if total_guests < 1 or total_guests > 10:
+                    return Response({
+                        'error': 'Capacity must be between 1 and 10'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return Response({
+                    'error': 'Capacity must be a valid number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            total_guests = adults_count + children_count
+            if total_guests < 1:
+                return Response({
+                    'error': 'Total guests (adults + children) must be at least 1'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            if total_guests > 10:
+                return Response({
+                    'error': 'Total guests (adults + children) cannot exceed 10'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Parse and validate dates if provided
+        check_in_date = None
+        check_out_date = None
+        dates_provided = bool(check_in and check_out)
+        
+        if check_in and check_out:
+            try:
+                check_in_date = datetime.strptime(check_in, '%Y-%m-%d').date()
+                check_out_date = datetime.strptime(check_out, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({
+                    'error': 'Invalid date format. Use YYYY-MM-DD'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate dates
+            if check_out_date <= check_in_date:
+                return Response({
+                    'error': 'Check-out date must be after check-in date'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        elif check_in or check_out:
+            return Response({
+                'error': 'Both check_in and check_out dates are required when using date filtering'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Start with active hotels
+        hotels_query = Hotel.objects.filter(is_active=True)
+        
+        # Filter by specific hotel if provided
+        if hotel_id:
+            hotels_query = hotels_query.filter(id=hotel_id)
+        
+        # Get available hotels
+        available_hotels = []
+        
+        for hotel in hotels_query:
+            # Find room types that match capacity requirements
+            room_types_query = RoomType.objects.filter(
+                rooms__hotel=hotel
+            ).distinct()
+            
+            # Filter by total guest capacity
+            room_types_query = room_types_query.filter(
+                max_capacity__gte=total_guests
+            )
+            
+            # Check availability for each room type
+            available_room_types = []
+            
+            for room_type in room_types_query:
+                # Get rooms of this type in this hotel
+                hotel_rooms = Room.objects.filter(
+                    hotel=hotel,
+                    room_type=room_type,
+                    is_active=True,
+                    is_maintenance=False,
+                    capacity__gte=total_guests
+                )
+                
+                # If dates are provided, check for availability
+                if dates_provided:
+                    # Check for conflicting bookings
+                    conflicting_bookings = Booking.objects.filter(
+                        room__in=hotel_rooms,
+                        status__in=['confirmed', 'checked_in'],
+                        check_in__lt=check_out_date,
+                        check_out__gt=check_in_date
+                    ).values_list('room_id', flat=True)
+                    
+                    # Get available rooms (exclude conflicted ones)
+                    available_rooms = hotel_rooms.exclude(id__in=conflicting_bookings)
+                else:
+                    # If no dates provided, all active rooms are considered available
+                    available_rooms = hotel_rooms
+                
+                available_count = available_rooms.count()
+                
+                if available_count > 0:
+                    # Get room details
+                    room_details = []
+                    for room in available_rooms[:5]:  # Limit to first 5 rooms for response size
+                        base_price = room.base_price
+                        room_details.append({
+                            'room_id': str(room.id),
+                            'room_number': room.room_number,
+                            'floor': room.floor,
+                            'capacity': room.capacity,
+                            'base_price': str(base_price),
+                            'view_type': room.view_type
+                        })
+                    
+                    available_room_types.append({
+                        'id': str(room_type.id),
+                        'name': room_type.name,
+                        'description': room_type.description,
+                        'max_capacity': room_type.max_capacity,
+                        'bed_type': room_type.bed_type,
+                        'bed_count': room_type.bed_count,
+                        'bathroom_count': room_type.bathroom_count,
+                        'room_size_sqm': room_type.room_size_sqm,
+                        'amenities': room_type.amenities_list,
+                        'is_accessible': room_type.is_accessible,
+                        'available_rooms': available_count,
+                        'available_room_details': room_details,
+                        'price_per_night': str(available_rooms.first().base_price) if available_rooms.exists() else '0.00',
+                        'total_rooms': hotel_rooms.count()
+                    })
+            
+            # If hotel has available room types, include it
+            if available_room_types:
+                # Calculate pricing if dates are provided
+                nights = 0
+                if dates_provided:
+                    nights = (check_out_date - check_in_date).days
+                
+                # Get min and max prices
+                prices = [float(rt['price_per_night']) for rt in available_room_types]
+                min_price = min(prices) if prices else 0
+                max_price = max(prices) if prices else 0
+                
+                # Calculate total price range if dates provided
+                total_min_price = min_price * nights if dates_provided else min_price
+                total_max_price = max_price * nights if dates_provided else max_price
+                
+                hotel_data = HotelSerializer(hotel).data
+                hotel_data.update({
+                    'available_room_types': available_room_types,
+                    'total_available_rooms': sum(rt['available_rooms'] for rt in available_room_types),
+                    'price_range': {
+                        'min_price_per_night': min_price,
+                        'max_price_per_night': max_price,
+                        'total_min_price': total_min_price,
+                        'total_max_price': total_max_price,
+                        'currency': 'USD'
+                    }
+                })
+                
+                available_hotels.append(hotel_data)
+        
+        # Prepare response
+        search_criteria = {
+            'adults': adults_count,
+            'children': children_count,
+            'total_guests': total_guests,
+            'dates_provided': dates_provided
+        }
+        
+        if dates_provided:
+            search_criteria.update({
+                'check_in': check_in,
+                'check_out': check_out,
+                'nights': nights
+            })
+        
+        if hotel_id:
+            search_criteria['hotel_id'] = hotel_id
+        
+        return Response({
+            'count': len(available_hotels),
+            'search_criteria': search_criteria,
+            'hotels': available_hotels,
+            'message': f'Found {len(available_hotels)} hotel(s) for {adults_count} adult(s) and {children_count} child(ren)' if available_hotels 
+                      else f'No hotels found for {adults_count} adult(s) and {children_count} child(ren)'
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': 'Internal server error',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
