@@ -3,12 +3,10 @@ from django.urls import path, include
 from django.http import JsonResponse
 
 try:
-    from rest_framework import permissions
-    from drf_yasg.views import get_schema_view
-    from drf_yasg import openapi
-    HAS_SWAGGER = True
+    from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+    HAS_SPECTACULAR = True
 except ImportError:
-    HAS_SWAGGER = False
+    HAS_SPECTACULAR = False
 
 def api_root(request):
     return JsonResponse({
@@ -30,17 +28,12 @@ urlpatterns = [
     path('api/v1/bookings/', include('bookings.urls')),
 ]
 
-if HAS_SWAGGER:
-    schema_view = get_schema_view(
-        openapi.Info(
-            title="Hotel Booking Engine API",
-            default_version='v1',
-            description="Hotel booking and management API",
-        ),
-        public=True,
-        permission_classes=(permissions.AllowAny,),
-    )
-    
+if HAS_SPECTACULAR:
     urlpatterns += [
-        path('api/v1/docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+        # API schema endpoint
+        path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
+        # Swagger UI endpoint
+        path('api/v1/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+        # Redoc UI endpoint
+        path('api/v1/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     ]

@@ -13,8 +13,7 @@ djangorestframework-simplejwt==5.3.0
 PyJWT==2.8.0
 
 # API Documentation
-drf-yasg==1.21.7
-swagger-spec-validator==3.0.3
+drf-spectacular==0.28.0
 PyYAML==6.0.2
 uritemplate==4.2.0
 inflection==0.5.1
