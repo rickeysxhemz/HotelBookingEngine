@@ -172,14 +172,73 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
     'SCHEMA_PATH_PREFIX': '/api/v1/',
     'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_COERCE_PATH_PK_TO_STRING': False,
+    'SCHEMA_COERCE_METHOD_NAMES': {
+        'retrieve': 'get',
+        'destroy': 'delete',
+    },
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
         'persistAuthorization': True,
         'displayOperationId': True,
+        'displayRequestDuration': True,
+        'showExtensions': True,
+        'showCommonExtensions': True,
+        'docExpansion': 'list',
+        'filter': True,
+        'syntaxHighlight.activate': True,
+        'syntaxHighlight.theme': 'agate',
+        'tryItOutEnabled': True,
+        'requestSnippetsEnabled': True,
+        'supportedSubmitMethods': ['get', 'post', 'put', 'delete', 'patch'],
+        'validatorUrl': None,
+        'withCredentials': True,
+        'showMutatedRequest': True,
+        'defaultModelRendering': 'example',
+        'defaultModelExpandDepth': 2,
+        'defaultModelsExpandDepth': 1,
+        'displayRequestDuration': True,
+        'showExtensions': True,
+        'showCommonExtensions': True,
     },
     'SWAGGER_UI_FAVICON_HREF': '/static/favicon.ico',
     'REDOC_UI_SETTINGS': {
         'hideDownloadButton': False,
         'expandResponses': '200,201',
-    }
+        'expandSingleSchemaField': True,
+        'hideHostname': False,
+        'hideLoading': False,
+        'nativeScrollbars': False,
+        'pathInMiddlePanel': False,
+        'requiredPropsFirst': True,
+        'scrollYOffset': 0,
+        'sortPropsAlphabetically': False,
+        'theme': {
+            'colors': {
+                'primary': {
+                    'main': '#32329f'
+                }
+            }
+        }
+    },
+    # Schema generation settings
+    'SORT_OPERATIONS': True,
+    'ENABLE_DJANGO_DEPLOY_CHECK': True,
+    'DISABLE_ERRORS_AND_WARNINGS': False,
+    'ENUM_NAME_OVERRIDES': {},
+    'ENUM_GENERATE_CHOICE_DESCRIPTION': True,
+    'POSTPROCESSING_HOOKS': [
+        'core.spectacular_hooks.postprocess_enhanced_schema'
+    ],
+    # Component naming
+    'COMPONENT_SPLIT_REQUEST': True,
+    'COMPONENT_NO_READ_ONLY_REQUIRED': True,
+    # Field handling
+    'DISABLE_ERRORS_AND_WARNINGS': False,
+    'SCHEMA_COERCE_PATH_PK': True,
+    'GENERIC_ADDITIONAL_PROPERTIES': 'dict',
+    # Authentication
+    'SERVE_AUTHENTICATION': None,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
+    'SERVE_PUBLIC': True,
 }

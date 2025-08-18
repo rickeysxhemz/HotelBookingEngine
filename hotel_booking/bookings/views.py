@@ -10,6 +10,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
+# drf-spectacular imports
+from drf_spectacular.utils import (
+    extend_schema, 
+    OpenApiParameter, 
+    OpenApiResponse,
+    OpenApiExample
+)
+from drf_spectacular.types import OpenApiTypes
+
 # Local imports
 from .models import Booking, BookingHistory
 from .serializers import (
@@ -17,6 +26,7 @@ from .serializers import (
     BookingUpdateSerializer, RoomAvailabilitySerializer, BookingCancellationSerializer,
     RoomSerializer, ExtraSerializer
 )
+from .email_service import BookingEmailService
 from core.models import Hotel, Room, Extra
 from core.services import HotelSearchService, RoomAvailabilityService
 
@@ -28,6 +38,77 @@ class BookingPagination(PageNumberPagination):
     max_page_size = 50
 
 
+@extend_schema(
+    operation_id='list_user_bookings',
+    summary='List User Bookings',
+    description='Retrieve a paginated list of bookings for the authenticated user with optional filtering and search.',
+    parameters=[
+        OpenApiParameter(
+            name='page',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Page number for pagination',
+            required=False
+        ),
+        OpenApiParameter(
+            name='page_size',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Number of items per page (max 50)',
+            required=False
+        ),
+        OpenApiParameter(
+            name='search',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description='Search by booking reference or primary guest name',
+            required=False
+        ),
+        OpenApiParameter(
+            name='ordering',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description='Order by: booking_date, check_in, total_price (prefix with - for descending)',
+            required=False,
+            examples=[
+                OpenApiExample('Most recent first', value='-booking_date'),
+                OpenApiExample('Check-in date ascending', value='check_in'),
+                OpenApiExample('Price descending', value='-total_price'),
+            ]
+        ),
+    ],
+    responses={
+        200: OpenApiResponse(
+            response=BookingListSerializer,
+            description='Successfully retrieved booking list',
+            examples=[
+                OpenApiExample(
+                    'Booking List Response',
+                    value={
+                        "count": 25,
+                        "next": "http://example.com/api/v1/bookings/?page=2",
+                        "previous": None,
+                        "results": [
+                            {
+                                "booking_reference": "BK123456789",
+                                "status": "confirmed",
+                                "booking_date": "2024-08-15T10:30:00Z",
+                                "check_in": "2024-12-25",
+                                "check_out": "2024-12-27",
+                                "total_price": "250.00",
+                                "hotel_name": "Grand Plaza Hotel",
+                                "room_number": "101"
+                            }
+                        ]
+                    }
+                )
+            ]
+        ),
+        401: OpenApiResponse(description='Authentication required'),
+        403: OpenApiResponse(description='Permission denied'),
+    },
+    tags=['Bookings']
+)
 class BookingListAPIView(generics.ListAPIView):
     """List user's bookings with filtering and pagination"""
     serializer_class = BookingListSerializer
@@ -49,6 +130,33 @@ class BookingListAPIView(generics.ListAPIView):
         )
 
 
+@extend_schema(
+    operation_id='get_booking_detail',
+    summary='Get Booking Details',
+    description='Retrieve detailed information about a specific booking using the booking reference.',
+    parameters=[
+        OpenApiParameter(
+            name='booking_reference',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            description='Unique booking reference number',
+            required=True,
+            examples=[
+                OpenApiExample('Booking Reference', value='BK123456789')
+            ]
+        ),
+    ],
+    responses={
+        200: OpenApiResponse(
+            response=BookingDetailSerializer,
+            description='Successfully retrieved booking details'
+        ),
+        401: OpenApiResponse(description='Authentication required'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Booking not found'),
+    },
+    tags=['Bookings']
+)
 class BookingDetailAPIView(generics.RetrieveAPIView):
     """Get detailed booking information"""
     serializer_class = BookingDetailSerializer
@@ -68,19 +176,74 @@ class BookingDetailAPIView(generics.RetrieveAPIView):
         )
 
 
+@extend_schema(
+    operation_id='create_booking',
+    summary='Create New Booking',
+    description='Create a new hotel booking with automatic confirmation email and booking reference generation.',
+    request=BookingCreateSerializer,
+    responses={
+        201: OpenApiResponse(
+            description='Booking created successfully',
+            examples=[
+                OpenApiExample(
+                    'Successful Booking Creation',
+                    value={
+                        "message": "Booking created successfully",
+                        "booking": {
+                            "booking_reference": "BK123456789",
+                            "status": "confirmed",
+                            "total_price": "250.00",
+                            "check_in": "2024-12-25",
+                            "check_out": "2024-12-27"
+                        },
+                        "email_notification": {
+                            "sent": True,
+                            "recipient": "guest@example.com"
+                        }
+                    }
+                )
+            ]
+        ),
+        400: OpenApiResponse(
+            description='Invalid booking data or room unavailable',
+            examples=[
+                OpenApiExample(
+                    'Validation Error',
+                    value={
+                        "error": "Room is not available for the selected dates"
+                    }
+                )
+            ]
+        ),
+        401: OpenApiResponse(description='Authentication required'),
+        403: OpenApiResponse(description='Permission denied'),
+    },
+    tags=['Bookings']
+)
 class BookingCreateAPIView(generics.CreateAPIView):
     """Create a new booking"""
     serializer_class = BookingCreateSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def create(self, request, *args, **kwargs):
-        """Create booking with transaction safety"""
+        """Create booking with transaction safety and email notification"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
         try:
             with transaction.atomic():
                 booking = serializer.save()
+                
+                # Send confirmation email
+                email_sent = BookingEmailService.send_booking_confirmation(booking)
+                
+                # Create history entry
+                BookingHistory.objects.create(
+                    booking=booking,
+                    action='created',
+                    description='Booking created successfully',
+                    performed_by=request.user
+                )
                 
                 # Return detailed booking information
                 detail_serializer = BookingDetailSerializer(
@@ -90,7 +253,11 @@ class BookingCreateAPIView(generics.CreateAPIView):
                 return Response(
                     {
                         'message': 'Booking created successfully',
-                        'booking': detail_serializer.data
+                        'booking': detail_serializer.data,
+                        'email_notification': {
+                            'sent': email_sent,
+                            'recipient': booking.primary_guest_email
+                        }
                     },
                     status=status.HTTP_201_CREATED
                 )
@@ -115,7 +282,7 @@ class BookingUpdateAPIView(generics.UpdateAPIView):
         )
     
     def update(self, request, *args, **kwargs):
-        """Update booking and return detailed information"""
+        """Update booking and return detailed information with email notification"""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -128,7 +295,19 @@ class BookingUpdateAPIView(generics.UpdateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        booking = serializer.save()
+        with transaction.atomic():
+            booking = serializer.save()
+            
+            # Send modification email
+            email_sent = BookingEmailService.send_booking_modification(booking)
+            
+            # Create history entry
+            BookingHistory.objects.create(
+                booking=booking,
+                action='modified',
+                description='Booking details updated',
+                performed_by=request.user
+            )
         
         # Return updated booking details
         detail_serializer = BookingDetailSerializer(
@@ -137,14 +316,69 @@ class BookingUpdateAPIView(generics.UpdateAPIView):
         
         return Response({
             'message': 'Booking updated successfully',
-            'booking': detail_serializer.data
+            'booking': detail_serializer.data,
+            'email_notification': {
+                'sent': email_sent,
+                'recipient': booking.primary_guest_email
+            }
         })
 
 
+@extend_schema(
+    operation_id='cancel_booking',
+    summary='Cancel Booking',
+    description='Cancel an existing booking with a specified reason. Sends automatic cancellation email to the guest.',
+    parameters=[
+        OpenApiParameter(
+            name='booking_reference',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            description='Unique booking reference number',
+            required=True,
+            examples=[
+                OpenApiExample('Booking Reference', value='BK123456789')
+            ]
+        ),
+    ],
+    request=BookingCancellationSerializer,
+    responses={
+        200: OpenApiResponse(
+            description='Booking cancelled successfully',
+            examples=[
+                OpenApiExample(
+                    'Successful Cancellation',
+                    value={
+                        "message": "Booking cancelled successfully",
+                        "booking_reference": "BK123456789",
+                        "email_notification": {
+                            "sent": True,
+                            "recipient": "guest@example.com"
+                        }
+                    }
+                )
+            ]
+        ),
+        400: OpenApiResponse(
+            description='Cannot cancel booking (invalid status or past dates)',
+            examples=[
+                OpenApiExample(
+                    'Cancellation Error',
+                    value={
+                        "error": "Cannot cancel booking - check-in date has passed"
+                    }
+                )
+            ]
+        ),
+        401: OpenApiResponse(description='Authentication required'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Booking not found'),
+    },
+    tags=['Bookings']
+)
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def cancel_booking(request, booking_reference):
-    """Cancel a booking"""
+    """Cancel a booking with email notification"""
     try:
         booking = get_object_or_404(
             Booking, 
@@ -166,6 +400,9 @@ def cancel_booking(request, booking_reference):
                 notes=serializer.validated_data.get('notes', '')
             )
             
+            # Send cancellation email
+            email_sent = BookingEmailService.send_booking_cancellation(booking)
+            
             # Create history entry
             BookingHistory.objects.create(
                 booking=booking,
@@ -176,7 +413,11 @@ def cancel_booking(request, booking_reference):
         
         return Response({
             'message': 'Booking cancelled successfully',
-            'booking_reference': booking.booking_reference
+            'booking_reference': booking.booking_reference,
+            'email_notification': {
+                'sent': email_sent,
+                'recipient': booking.primary_guest_email
+            }
         })
         
     except Exception as e:
@@ -282,6 +523,47 @@ def check_out_booking(request, booking_reference):
         )
 
 
+@extend_schema(
+    summary="Search Available Rooms (POST)",
+    description="Search for available rooms using POST request with detailed search criteria. Hotel ID is optional.",
+    request=RoomAvailabilitySerializer,
+    examples=[
+        OpenApiExample(
+            'Search All Hotels',
+            summary='Search all hotels for available rooms',
+            description='Search across all hotels without specifying hotel_id',
+            value={
+                'check_in': '2025-08-20',
+                'check_out': '2025-08-23',
+                'guests': 2
+            }
+        ),
+        OpenApiExample(
+            'Search Specific Hotel',
+            summary='Search a specific hotel',
+            description='Search only a specific hotel using hotel_id',
+            value={
+                'check_in': '2025-08-20',
+                'check_out': '2025-08-23',
+                'guests': 2,
+                'hotel_id': '123e4567-e89b-12d3-a456-426614174000'
+            }
+        ),
+        OpenApiExample(
+            'Search with Filters',
+            summary='Search with additional filters',
+            description='Search with hotel_id, room_type_id and price filters',
+            value={
+                'check_in': '2025-08-20',
+                'check_out': '2025-08-23',
+                'guests': 2,
+                'hotel_id': '123e4567-e89b-12d3-a456-426614174000',
+                'room_type_id': '456e7890-e89b-12d3-a456-426614174001',
+                'max_price': '250.00'
+            }
+        ),
+    ]
+)
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def search_rooms(request):

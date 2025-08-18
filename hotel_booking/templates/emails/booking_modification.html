@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Booking Modified</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #f39c12; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .booking-details { background-color: white; padding: 15px; margin: 15px 0; border-left: 4px solid #f39c12; }
+        .detail-row { display: flex; justify-content: space-between; margin: 10px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .btn { display: inline-block; background-color: #f39c12; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Booking Modified</h1>
+            <p>Your reservation has been updated</p>
+        </div>
+        
+        <div class="content">
+            <p>Dear {{ guest_name }},</p>
+            
+            <p>We confirm that your reservation at <strong>{{ hotel.name }}</strong> has been successfully modified. Below are your updated booking details:</p>
+            
+            <div class="booking-details">
+                <h3>Updated Booking Information</h3>
+                <div class="detail-row">
+                    <span><strong>Booking Reference:</strong></span>
+                    <span>{{ booking.booking_reference }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Guest Name:</strong></span>
+                    <span>{{ booking.primary_guest_name }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Email:</strong></span>
+                    <span>{{ booking.primary_guest_email }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Phone:</strong></span>
+                    <span>{{ booking.primary_guest_phone }}</span>
+                </div>
+            </div>
+            
+            <div class="booking-details">
+                <h3>Updated Stay Details</h3>
+                <div class="detail-row">
+                    <span><strong>Hotel:</strong></span>
+                    <span>{{ hotel.name }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Room Type:</strong></span>
+                    <span>{{ room_type.name }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Room Number:</strong></span>
+                    <span>{{ room.room_number }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Check-in:</strong></span>
+                    <span>{{ booking.check_in|date:"F d, Y" }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Check-out:</strong></span>
+                    <span>{{ booking.check_out|date:"F d, Y" }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Number of Nights:</strong></span>
+                    <span>{{ nights }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Number of Guests:</strong></span>
+                    <span>{{ booking.guests }}</span>
+                </div>
+            </div>
+            
+            <div class="booking-details">
+                <h3>Updated Pricing Information</h3>
+                <div class="detail-row">
+                    <span><strong>Room Price:</strong></span>
+                    <span>${{ booking.room_price }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Extras:</strong></span>
+                    <span>${{ booking.extras_price }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Tax:</strong></span>
+                    <span>${{ booking.tax_amount }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Total Amount:</strong></span>
+                    <span><strong>${{ booking.total_price }}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>Payment Status:</strong></span>
+                    <span>{{ booking.get_payment_status_display }}</span>
+                </div>
+            </div>
+            
+            {% if booking.special_requests %}
+            <div class="booking-details">
+                <h3>Special Requests</h3>
+                <p>{{ booking.special_requests }}</p>
+            </div>
+            {% endif %}
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="#" class="btn">View Updated Booking</a>
+            </div>
+            
+            <p>If you have any questions about these changes or need further assistance, please contact us:</p>
+            <p><strong>Email:</strong> {{ hotel.contact_email|default:"info@hotelbooking.com" }}<br>
+            <strong>Phone:</strong> {{ hotel.contact_phone|default:"1-800-HOTEL" }}</p>
+            
+            <p>Thank you for choosing {{ hotel.name }}!</p>
+        </div>
+        
+        <div class="footer">
+            <p>This is an automated email. Please do not reply directly to this message.</p>
+            <p>&copy; {{ hotel.name }} - All rights reserved</p>
+        </div>
+    </div>
+</body>
+</html>

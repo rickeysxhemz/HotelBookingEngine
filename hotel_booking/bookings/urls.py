@@ -8,10 +8,15 @@ Design Principles:
 """
 from django.urls import path
 from . import views
+from .booking_flow_api import CompleteBookingFlowAPIView, search_rooms_only
 
 app_name = 'bookings'
 
 urlpatterns = [
+    # === COMPLETE BOOKING FLOW ===
+    path('complete-booking/', CompleteBookingFlowAPIView.as_view(), name='complete_booking_flow'),
+    path('search-rooms/', search_rooms_only, name='search_rooms_only'),
+    
     # === BOOKING SEARCH ===
     path('search/', views.BookingSearchAPIView.as_view(), name='booking_search'),
     path('search/availability/', views.AvailabilitySearchAPIView.as_view(), name='availability_search'),

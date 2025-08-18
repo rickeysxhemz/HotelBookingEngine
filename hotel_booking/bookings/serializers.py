@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from decimal import Decimal
+from datetime import datetime, date
 
 # Local imports
 from .models import Booking, BookingExtra, BookingGuest, BookingHistory
@@ -12,6 +13,125 @@ from core.services import (
     PricingService, 
     RoomAvailabilityService
 )
+
+
+class CompleteBookingFlowSerializer(serializers.Serializer):
+    """Serializer for complete booking flow API"""
+    
+    # Search criteria
+    hotel_id = serializers.UUIDField(
+        required=False, 
+        allow_null=True,
+        help_text="(Optional) Hotel ID to search in. If not provided, will search across all hotels in the location or all available hotels."
+    )
+    location = serializers.CharField(
+        required=False, 
+        allow_blank=True,
+        help_text="(Optional) City or location to search for hotels. If hotel_id is provided, this field is ignored. If neither hotel_id nor location is provided, searches all hotels."
+    )
+    check_in = serializers.DateField(
+        help_text="Check-in date in YYYY-MM-DD format. Must be today or in the future."
+    )
+    check_out = serializers.DateField(
+        help_text="Check-out date in YYYY-MM-DD format. Must be after check-in date."
+    )
+    guests = serializers.IntegerField(
+        min_value=1, 
+        max_value=10, 
+        default=1,
+        help_text="Number of guests. Defaults to 1 if not specified."
+    )
+    
+    # Booking details
+    room_id = serializers.UUIDField(
+        required=False, 
+        allow_null=True,
+        help_text="Specific room ID to book. If not provided, system will assign an available room of the selected type."
+    )
+    primary_guest_name = serializers.CharField(
+        max_length=100,
+        help_text="Full name of the primary guest as it appears on ID."
+    )
+    primary_guest_email = serializers.EmailField(
+        help_text="Email address for booking confirmation and communication."
+    )
+    primary_guest_phone = serializers.CharField(
+        max_length=20,
+        help_text="Phone number for contact purposes."
+    )
+    special_requests = serializers.CharField(
+        required=False, 
+        allow_blank=True,
+        help_text="Any special requests or notes for the hotel staff."
+    )
+    
+    # Extras
+    extras = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        allow_empty=True,
+        help_text="List of extra services. Each item should contain 'extra_id' and optionally 'quantity'."
+    )
+    
+    # Payment
+    payment_method = serializers.CharField(
+        default='card',
+        help_text="Payment method. Defaults to 'card'."
+    )
+    save_payment_method = serializers.BooleanField(
+        default=False,
+        help_text="Whether to save payment method for future bookings. Defaults to false."
+    )
+    
+    def validate(self, data):
+        """Validate booking data"""
+        check_in = data.get('check_in')
+        check_out = data.get('check_out')
+        
+        # Validate dates
+        if check_in and check_out:
+            if check_in >= check_out:
+                raise serializers.ValidationError("Check-out date must be after check-in date")
+            
+            if check_in < date.today():
+                raise serializers.ValidationError("Check-in date cannot be in the past")
+        
+        # Validate extras format
+        extras = data.get('extras', [])
+        for extra in extras:
+            if 'extra_id' not in extra:
+                raise serializers.ValidationError("Each extra must have an 'extra_id'")
+            if 'quantity' not in extra:
+                extra['quantity'] = 1
+        
+        return data
+
+
+class RoomSearchResultSerializer(serializers.Serializer):
+    """Serializer for room search results"""
+    room_id = serializers.UUIDField(help_text="Unique identifier for the room")
+    room_number = serializers.CharField(help_text="Room number as displayed in the hotel")
+    room_type = serializers.DictField(help_text="Detailed room type information including amenities and features")
+    hotel = serializers.DictField(help_text="Hotel information including name, address, and contact details")
+    pricing = serializers.DictField(help_text="Pricing information for the specified dates")
+    images = serializers.ListField(help_text="List of room images with URLs and metadata")
+    availability_info = serializers.DictField(
+        required=False,
+        help_text="Additional availability information if applicable"
+    )
+
+
+class BookingConfirmationSerializer(serializers.Serializer):
+    """Serializer for booking confirmation response"""
+    success = serializers.BooleanField(help_text="Whether the booking was successful")
+    message = serializers.CharField(help_text="Status message or error description")
+    booking = serializers.DictField(help_text="Complete booking details including confirmation number")
+    available_rooms = serializers.ListField(
+        required=False,
+        help_text="Alternative room options if the requested room is not available"
+    )
+    payment = serializers.DictField(help_text="Payment processing information and status")
+    email_notification = serializers.DictField(help_text="Email notification status and details")
 
 
 class RoomTypeSerializer(serializers.ModelSerializer):
@@ -511,11 +631,25 @@ class BookingUpdateSerializer(serializers.ModelSerializer):
 
 class RoomAvailabilitySerializer(serializers.Serializer):
     """Serializer for room availability search"""
-    check_in = serializers.DateField()
-    check_out = serializers.DateField()
-    guests = serializers.IntegerField(min_value=1, max_value=10)
-    hotel_id = serializers.UUIDField(required=False)
-    room_type_id = serializers.UUIDField(required=False)
+    check_in = serializers.DateField(
+        help_text="Check-in date in YYYY-MM-DD format"
+    )
+    check_out = serializers.DateField(
+        help_text="Check-out date in YYYY-MM-DD format"
+    )
+    guests = serializers.IntegerField(
+        min_value=1, 
+        max_value=10,
+        help_text="Number of guests (1-10)"
+    )
+    hotel_id = serializers.UUIDField(
+        required=False,
+        help_text="(Optional) Specific hotel ID to search. If not provided, searches all available hotels."
+    )
+    room_type_id = serializers.UUIDField(
+        required=False,
+        help_text="(Optional) Specific room type ID to filter by."
+    )
     max_price = serializers.DecimalField(
         max_digits=10, 
         decimal_places=2, 
