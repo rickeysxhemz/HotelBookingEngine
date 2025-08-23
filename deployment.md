@@ -5,7 +5,7 @@ Complete step-by-step guide for deploying the Hotel Booking Engine API on VPS ho
 ## 📋 Prerequisites
 
 ### VPS Requirements
-- **Operating System:** Ubuntu 20.04+ or CentOS 8+
+- **Operating System:** AlmaLinux 8+/9+ (Red Hat Enterprise Linux compatible)
 - **RAM:** Minimum 2GB (4GB recommended)
 - **CPU:** 2+ cores
 - **Storage:** 20GB+ SSD
@@ -33,17 +33,50 @@ ssh username@YOUR_VPS_IP
 ssh -i /path/to/your/key.pem username@YOUR_VPS_IP
 ```
 
+### AlmaLinux-Specific Setup
+
+```bash
+# Check AlmaLinux version
+cat /etc/os-release
+
+# Ensure system is up to date
+sudo dnf check-update
+
+# Install commonly needed repositories
+sudo dnf install -y epel-release
+sudo dnf config-manager --set-enabled powertools  # For AlmaLinux 8
+# OR for AlmaLinux 9:
+# sudo dnf config-manager --set-enabled crb
+
+# Update repository cache
+sudo dnf makecache
+
+# Install Podman-Docker compatibility (Alternative to Docker)
+# Note: AlmaLinux/RHEL often prefer Podman over Docker
+# Uncomment the following lines if you prefer Podman:
+# sudo dnf install -y podman podman-docker
+# sudo systemctl enable --now podman.socket
+# alias docker=podman
+# alias docker-compose=podman-compose
+```
+
 ### Update System
 
 ```bash
 # Update package lists and upgrade system
-sudo apt update && sudo apt upgrade -y
+sudo dnf update -y && sudo dnf upgrade -y
 
 # Install essential tools
-sudo apt install -y git curl wget unzip software-properties-common htop nano
+sudo dnf install -y git curl wget unzip htop nano
+
+# Install Development Tools group
+sudo dnf groupinstall -y "Development Tools"
 
 # Install Python 3 and pip (if not already installed)
-sudo apt install -y python3 python3-pip
+sudo dnf install -y python3 python3-pip
+
+# Install EPEL repository for additional packages
+sudo dnf install -y epel-release
 
 # Reboot if kernel was updated
 sudo reboot
@@ -53,7 +86,7 @@ sudo reboot
 
 ## 🐳 STEP 2: Install Docker & Docker Compose
 
-### Install Docker
+### Option A: Install Docker (Recommended)
 
 ```bash
 # Download and install Docker
@@ -64,7 +97,26 @@ sudo sh get-docker.sh
 docker --version
 ```
 
-### Install Docker Compose
+### Option B: Install Podman (RHEL Native Alternative)
+
+```bash
+# Install Podman (Red Hat's container engine)
+sudo dnf install -y podman podman-docker podman-compose
+
+# Enable Podman socket for Docker compatibility
+sudo systemctl enable --now podman.socket
+
+# Create Docker alias for compatibility
+echo 'alias docker=podman' >> ~/.bashrc
+echo 'alias docker-compose=podman-compose' >> ~/.bashrc
+source ~/.bashrc
+
+# Verify Podman installation
+podman --version
+podman-compose --version
+```
+
+### Install Docker Compose (If using Docker)
 
 ```bash
 # Install Docker Compose
@@ -77,16 +129,44 @@ sudo chmod +x /usr/local/bin/docker-compose
 docker-compose --version
 ```
 
-### Configure Docker Permissions
+### Configure Container Permissions
 
 ```bash
-# Add current user to docker group
+# For Docker: Add current user to docker group
 sudo usermod -aG docker $USER
+
+# For Podman: Enable rootless containers (already default)
+# No additional configuration needed for Podman
 
 # Apply group changes (logout and login again)
 exit
 # SSH back in
 ssh root@YOUR_VPS_IP
+```
+
+### SELinux Configuration (AlmaLinux/RHEL)
+
+```bash
+# Check SELinux status
+getenforce
+
+# If SELinux is enabled, configure it for Docker and web services
+if [ "$(getenforce)" != "Disabled" ]; then
+    # Allow Docker to work with SELinux
+    sudo setsebool -P container_manage_cgroup 1
+    
+    # Allow web services to make network connections
+    sudo setsebool -P httpd_can_network_connect 1
+    sudo setsebool -P httpd_can_network_relay 1
+    
+    # Allow containers to use all system resources
+    sudo setsebool -P virt_use_nfs 1
+    sudo setsebool -P virt_use_samba 1
+    
+    echo "SELinux configured for Docker and web services"
+else
+    echo "SELinux is disabled"
+fi
 ```
 
 ---
@@ -182,22 +262,28 @@ python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(50))"
 ### Setup Firewall
 
 ```bash
-# Enable UFW firewall
-sudo ufw enable
+# Enable and start firewalld
+sudo systemctl enable firewalld
+sudo systemctl start firewalld
 
 # Allow SSH (CRITICAL - Don't lock yourself out!)
-sudo ufw allow ssh
-sudo ufw allow 22
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --permanent --add-port=22/tcp
 
 # Allow HTTP and HTTPS
-sudo ufw allow 80
-sudo ufw allow 443
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --permanent --add-port=443/tcp
 
 # Optional: Allow direct API access
-sudo ufw allow 8000
+sudo firewall-cmd --permanent --add-port=8000/tcp
+
+# Reload firewall rules
+sudo firewall-cmd --reload
 
 # Check firewall status
-sudo ufw status verbose
+sudo firewall-cmd --list-all
 ```
 
 ### Create Non-Root User (Recommended)
@@ -347,11 +433,14 @@ curl http://yourdomain.com/api/v1/health/
 ### Install Certbot
 
 ```bash
-# Install Certbot via Snap
-sudo snap install --classic certbot
+# Install Certbot via DNF (AlmaLinux/RHEL)
+sudo dnf install -y certbot
 
-# Create symlink
-sudo ln -s /snap/bin/certbot /usr/bin/certbot
+# Alternative: Install via Snap if available
+# sudo dnf install -y snapd
+# sudo systemctl enable --now snapd.socket
+# sudo snap install --classic certbot
+# sudo ln -s /snap/bin/certbot /usr/bin/certbot
 ```
 
 ### Obtain SSL Certificate
@@ -618,6 +707,44 @@ openssl x509 -in ssl/fullchain.pem -text -noout
 
 # Renew certificate manually
 sudo certbot renew
+
+# For AlmaLinux/RHEL, if using DNF-installed certbot
+sudo systemctl reload nginx  # or restart your web server
+```
+
+#### SELinux Issues (AlmaLinux/RHEL)
+```bash
+# Check SELinux denials
+sudo ausearch -m avc -ts recent
+
+# Temporarily disable SELinux for testing (NOT recommended for production)
+sudo setenforce 0
+
+# Re-enable SELinux
+sudo setenforce 1
+
+# Generate SELinux policy for Docker (if needed)
+sudo audit2allow -a -M mydocker
+sudo semodule -i mydocker.pp
+
+# Check SELinux context of Docker files
+ls -laZ /var/lib/docker/
+```
+
+#### Firewall Issues (AlmaLinux/RHEL)
+```bash
+# Check if firewalld is blocking connections
+sudo firewall-cmd --list-all
+
+# Temporarily disable firewall for testing
+sudo systemctl stop firewalld
+
+# Re-enable firewall
+sudo systemctl start firewalld
+
+# Add custom port or service
+sudo firewall-cmd --permanent --add-port=8000/tcp
+sudo firewall-cmd --reload
 ```
 
 #### Out of Disk Space
@@ -648,11 +775,16 @@ docker-compose -f docker-compose.prod.yml logs db
 # Nginx logs
 docker-compose -f docker-compose.prod.yml logs nginx
 
-# System logs
+# System logs (AlmaLinux/RHEL)
 sudo journalctl -u docker
+sudo journalctl -u firewalld
+
+# SELinux logs (if enabled)
+sudo ausearch -m avc -ts recent
 
 # Server logs
-tail -f /var/log/syslog
+sudo journalctl -f
+tail -f /var/log/messages
 ```
 
 ### Performance Monitoring
@@ -691,15 +823,19 @@ docker-compose -f docker-compose.prod.yml exec db psql -U hotel_booking_user -d 
 # Disable root login (optional)
 sudo nano /etc/ssh/sshd_config
 # Set: PermitRootLogin no
-sudo systemctl restart ssh
+sudo systemctl restart sshd
 
-# Enable automatic security updates
-sudo apt install unattended-upgrades
-sudo dpkg-reconfigure unattended-upgrades
+# Enable automatic security updates (AlmaLinux/RHEL)
+sudo dnf install -y dnf-automatic
+sudo systemctl enable --now dnf-automatic.timer
 
 # Monitor failed login attempts
-sudo apt install fail2ban
-sudo systemctl enable fail2ban
+sudo dnf install -y fail2ban
+sudo systemctl enable --now fail2ban
+
+# Configure SELinux (if enabled)
+sudo setsebool -P httpd_can_network_connect 1
+sudo setsebool -P httpd_can_network_relay 1
 ```
 
 ---
@@ -716,9 +852,9 @@ sudo systemctl enable fail2ban
 ### Regular Maintenance Tasks
 
 - **Daily:** Monitor application logs and performance
-- **Weekly:** Check backup integrity
-- **Monthly:** Update system packages, renew SSL certificates
-- **Quarterly:** Review security settings, update application
+- **Weekly:** Check backup integrity, review security logs
+- **Monthly:** Update system packages (`sudo dnf update`), renew SSL certificates
+- **Quarterly:** Review security settings, update application, check SELinux policies
 
 ---
 
