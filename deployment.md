@@ -950,7 +950,49 @@ chmod +x fix-registry.sh
 
 **Why this happens:** Podman on AlmaLinux/RHEL sometimes defaults to Red Hat's registry instead of Docker Hub, causing authentication and "repo not found" errors.
 
-#### 2. Container Won't Start
+#### 2. DNS Port Conflict (Aardvark-DNS Error)
+**Error:** `aardvark-dns failed to start: Error from child process... failed to bind udp listener on 10.89.0.1:53: Address already in use`
+
+**Solution:**
+```bash
+# Configure Podman to avoid DNS port conflicts
+mkdir -p ~/.config/containers
+cat > ~/.config/containers/containers.conf << EOF
+[network]
+dns_bind_port = 0
+
+[engine]
+network_cmd_options = ["enable_ipv6=false"]
+EOF
+
+# Clean up existing networks
+podman network prune -f
+podman-compose -f docker-compose.prod.yml down --volumes
+
+# Restart deployment
+./deploy.sh
+```
+
+**Alternative Solution - Disable systemd-resolved:**
+```bash
+# If the above doesn't work, disable systemd-resolved temporarily
+sudo systemctl stop systemd-resolved
+sudo systemctl disable systemd-resolved
+
+# Use alternative DNS
+echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+
+# Run deployment
+./deploy.sh
+
+# Re-enable systemd-resolved after deployment
+sudo systemctl enable systemd-resolved
+sudo systemctl start systemd-resolved
+```
+
+**Why this happens:** Podman's DNS service (aardvark-dns) conflicts with system DNS services like systemd-resolved that are already using port 53.
+
+#### 3. Container Won't Start
 ```bash
 # Check container logs for errors
 podman-compose -f docker-compose.prod.yml logs
@@ -966,7 +1008,7 @@ podman-compose -f docker-compose.prod.yml build --no-cache
 podman-compose -f docker-compose.prod.yml up -d
 ```
 
-#### 2. Database Connection Error
+#### 4. Database Connection Error
 ```bash
 # Check database container status
 podman-compose -f docker-compose.prod.yml ps
@@ -982,7 +1024,7 @@ podman-compose -f docker-compose.prod.yml down -v
 podman-compose -f docker-compose.prod.yml up -d
 ```
 
-#### 3. API Health Check Fails
+#### 5. API Health Check Fails
 ```bash
 # 1. Check if API container is running
 podman-compose -f docker-compose.prod.yml ps

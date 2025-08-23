@@ -66,6 +66,22 @@ podman pull docker.io/postgres:15-alpine
 podman pull docker.io/redis:7-alpine  
 podman pull docker.io/nginx:alpine
 
+# Configure Podman networking to avoid DNS conflicts
+echo "🌐 Configuring Podman networking..."
+mkdir -p ~/.config/containers
+cat > ~/.config/containers/containers.conf << EOF
+[network]
+dns_bind_port = 0
+
+[engine]
+network_cmd_options = ["enable_ipv6=false"]
+EOF
+
+# Stop any existing containers and clean up networks
+echo "🧹 Cleaning up existing containers and networks..."
+podman-compose -f docker-compose.prod.yml down --volumes 2>/dev/null || true
+podman network prune -f 2>/dev/null || true
+
 # Build and start containers
 echo "🐳 Building and starting containers with Podman..."
 podman-compose -f docker-compose.prod.yml down --volumes

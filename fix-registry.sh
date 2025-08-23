@@ -25,9 +25,22 @@ EOF
 
 echo "✅ Registry configuration updated"
 
-# Clean up any existing broken containers
-echo "🧹 Cleaning up existing containers..."
+# Configure Podman networking to avoid DNS conflicts
+echo "🌐 Configuring Podman networking..."
+cat > ~/.config/containers/containers.conf << EOF
+[network]
+dns_bind_port = 0
+
+[engine]
+network_cmd_options = ["enable_ipv6=false"]
+EOF
+
+echo "✅ Networking configuration updated"
+
+# Clean up any existing broken containers and networks
+echo "🧹 Cleaning up existing containers and networks..."
 podman-compose -f docker-compose.prod.yml down --volumes 2>/dev/null || true
+podman network prune -f 2>/dev/null || true
 
 # Pre-pull required images from Docker Hub
 echo "📥 Pre-pulling required images from Docker Hub..."
