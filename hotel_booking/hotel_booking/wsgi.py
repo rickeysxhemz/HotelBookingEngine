@@ -11,10 +11,8 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-# Use deployment.py for production, settings.py for development
-if os.environ.get('DJANGO_ENV') == 'production':
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'hotel_booking.deployment')
-else:
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'hotel_booking.settings')
+
+# DJANGO_SETTINGS_MODULE must be set in the environment for deployment.
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'hotel_booking.settings')
 
 application = get_wsgi_application()
