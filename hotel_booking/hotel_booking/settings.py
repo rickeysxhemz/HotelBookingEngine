@@ -18,6 +18,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lamb
 
 # Application definition
 INSTALLED_APPS = [
+    'jazzmin',  # Django Jazzmin admin theme
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -34,6 +35,7 @@ EXTERNAL_APPS = [
     'accounts',
     'bookings',
     'core',
+    'manager',
 ]
 
 INSTALLED_APPS += EXTERNAL_APPS
@@ -123,9 +125,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
-LOGIN_URL = 'accounts:login'
-LOGIN_REDIRECT_URL = 'accounts:profile'
-LOGOUT_REDIRECT_URL = 'accounts:login'
+
 
 # Email Configuration for Gmail SMTP
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -285,3 +285,4 @@ SPECTACULAR_SETTINGS = {
     'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
     'SERVE_PUBLIC': True,
 }
+

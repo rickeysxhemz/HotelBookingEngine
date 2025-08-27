@@ -1,4 +1,5 @@
 from django.contrib import admin
+# manager admin removed; only default admin is used
 from django.urls import path, include
 from django.http import JsonResponse
 from core.health import health_check
@@ -26,6 +27,7 @@ def api_root(request):
 urlpatterns = [
     # API endpoints
     path('admin/', admin.site.urls),
+    path('manager/', include('manager.urls')),
     path('api/v1/', api_root, name='api_root'),
     path('api/v1/health/', health_check, name='health_check'),
     path('api/v1/auth/', include('accounts.urls')),

@@ -1,0 +1,77 @@
+{% extends 'manager/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-12 col-lg-3">
+    <div class="card p-3">
+      <div class="text-muted small">Total Bookings</div>
+      <div class="fs-3 fw-bold">{{ total_bookings }}</div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-3">
+    <div class="card p-3">
+      <div class="text-muted small">New Today</div>
+      <div class="fs-3 fw-bold">{{ new_bookings }}</div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-3">
+    <div class="card p-3">
+      <div class="text-muted small">Checked In</div>
+      <div class="fs-3 fw-bold">{{ checked_in }}</div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-3">
+    <div class="card p-3">
+      <div class="text-muted small">Upcoming</div>
+      <div class="fs-3 fw-bold">{{ upcoming }}</div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    <div class="card p-3">
+      <h5 class="mb-3">Recent Bookings</h5>
+      <div class="list-group">
+        {% for b in recent_bookings %}
+          <div class="list-group-item d-flex justify-content-between align-items-start">
+            <div>
+              <div class="fw-bold">{{ b.booking_reference }} — {{ b.primary_guest_name }}</div>
+              <div class="small text-muted">{{ b.check_in }} to {{ b.check_out }} • {{ b.get_status_display }}</div>
+            </div>
+            <div class="text-end">
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'manager:booking_detail' b.pk %}">Details</a>
+            </div>
+          </div>
+        {% empty %}
+          <div class="list-group-item">No recent bookings</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card p-3">
+      <h5>Inventory</h5>
+      <div class="row text-center">
+        <div class="col-4">
+          <div class="fw-bold">{{ hotels_count }}</div>
+          <div class="small text-muted">Hotels</div>
+        </div>
+        <div class="col-4">
+          <div class="fw-bold">{{ rooms_count }}</div>
+          <div class="small text-muted">Rooms</div>
+        </div>
+        <div class="col-4">
+          <div class="fw-bold">{{ extras_count }}</div>
+          <div class="small text-muted">Extras</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

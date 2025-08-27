@@ -1,0 +1,31 @@
+/* Manager admin color scheme */
+:root{
+  --brand: #2b6cb0; /* blue */
+  --accent: #f6ad55; /* orange */
+  --dark: #0f1724;
+  --muted: #6b7280;
+  --bg: #f3f6fb;
+}
+body.manager-layout{ background: var(--bg); color: var(--dark); }
+
+/* Sidebar */
+#sidebar-wrapper{ width: 250px; min-height:100vh; }
+.sidebar-heading{ padding: 1rem 1.25rem; font-weight:700; }
+.list-group-item{ border: none; padding: 0.85rem 1.25rem; }
+.list-group-item:hover{ background: rgba(255,255,255,0.03); }
+
+/* Page content */
+#page-content-wrapper{ flex:1; }
+
+.stat-box { min-height: 90px; border-left: 4px solid var(--brand); background: white; }
+
+.card { border-radius: 0.6rem; box-shadow: 0 1px 3px rgba(16,24,40,0.05); }
+
+/* Header small elements */
+.navbar .btn-primary { background: var(--brand); border-color: var(--brand); }
+
+@media (max-width: 768px){
+  #sidebar-wrapper{ position: fixed; z-index: 1040; transform: translateX(-260px); transition: transform .25s ease-in-out; }
+  #sidebar-wrapper.open{ transform: translateX(0); }
+}
+

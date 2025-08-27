@@ -1,3 +1,5 @@
+
+
 # Django imports
 from django.contrib import admin
 from django.utils.html import format_html
@@ -562,3 +564,57 @@ class SeasonalPricingAdmin(admin.ModelAdmin):
         else:
             return ', '.join(days)
     applicable_days.short_description = 'Applicable Days'
+
+
+# Manager admin removed — use only the default admin site (admin.site)
+
+# Restrict the default admin site to superusers only so manager staff cannot access it
+def _admin_site_has_permission(request):
+    user = getattr(request, 'user', None)
+    return bool(user and user.is_authenticated and user.is_active and getattr(user, 'is_superuser', False))
+
+# Patch the default admin.site permission check
+admin.site.has_permission = _admin_site_has_permission
+
+# Make admin logout redirect to API root for both admin sites
+from django.contrib.auth import logout as auth_logout
+from django.shortcuts import redirect
+
+def _admin_logout_view(request, extra_context=None):
+    """Logout the user and redirect to API root."""
+    # perform django logout
+    auth_logout(request)
+    return redirect('/api/v1/')
+
+# Assign the logout handler to both admin sites. Django resolves the view from the
+# AdminSite instance, so assigning a callable that accepts (request, extra_context=None)
+# will be used when admin logout URL is invoked.
+admin.site.logout = _admin_logout_view
+
+# Improve default admin index behavior: if a logged-in user lacks permission (e.g., a manager
+# account), show a helpful 403 page with a logout link instead of a 404 which is confusing.
+from django.http import HttpResponse
+from django.utils.safestring import mark_safe
+
+def _default_admin_index(request, extra_context=None):
+    # If allowed, render normal admin index
+    if admin.site.has_permission(request):
+        return admin.site._orig_index(request, extra_context=extra_context) if hasattr(admin.site, '_orig_index') else admin.site.index(request, extra_context=extra_context)
+
+    # Not allowed: if not authenticated, show login
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return admin.site.login(request, extra_context=extra_context)
+
+    # Authenticated but lacks permission -> show message with logout link
+    logout_url = reverse(f'{admin.site.name}:logout')
+    body = (
+        f"<h1>Access denied</h1>"
+        f"<p>You are signed in as <strong>{request.user}</strong> but do not have access to this admin panel.</p>"
+        f"<p><a href='{logout_url}'>Click here to log out</a> and sign in with a different account.</p>"
+    )
+    return HttpResponse(mark_safe(body), status=403)
+
+# Backup original index if present then patch
+if hasattr(admin.site, 'index'):
+    admin.site._orig_index = admin.site.index
+admin.site.index = _default_admin_index

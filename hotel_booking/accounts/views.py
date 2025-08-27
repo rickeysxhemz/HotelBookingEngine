@@ -129,7 +129,6 @@ def login_api_view(request):
         'user': UserSerializer(user).data
     })
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_api_view(request):

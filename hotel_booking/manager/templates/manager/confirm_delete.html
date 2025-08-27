@@ -1,0 +1,14 @@
+{% extends 'manager/base.html' %}
+{% block title %}Confirm Delete{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">Confirm Delete</h5>
+    <p>Are you sure you want to delete "{{ object }}"?</p>
+    <form method="post">{% csrf_token %}
+      <button type="submit" class="btn btn-danger">Confirm</button>
+      <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="btn btn-secondary">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

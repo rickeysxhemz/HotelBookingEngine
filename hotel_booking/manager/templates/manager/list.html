@@ -1,0 +1,76 @@
+{% extends 'manager/base.html' %}
+{% block title %}List{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+      <h5 class="card-title">{{ model_verbose_name_plural|title }}</h5>
+      <div class="mb-3 d-flex justify-content-between align-items-center">
+        <form class="d-flex" method="get">
+          <input name="q" class="form-control form-control-sm me-2" placeholder="Search..." value="{{ request.GET.q }}">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">Search</button>
+        </form>
+        <div>
+          {% if add_url_name and can_add %}
+            <a class="btn btn-sm btn-primary" href="{% url add_url_name %}">Add New</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="mb-2 d-flex gap-2">
+        {% if can_view %}
+          <button id="bulkExport" class="btn btn-sm btn-outline-success">Export Selected</button>
+        {% endif %}
+        {% if can_delete %}
+          <button id="bulkDelete" class="btn btn-sm btn-outline-danger">Delete Selected</button>
+        {% endif %}
+      </div>
+    <table class="table table-hover">
+      <thead>
+        <tr>
+            <th style="width:36px;"><input id="selectAll" type="checkbox"></th>
+            {% for field in model_fields|slice:":3" %}
+            <th>{{ field.verbose_name|title }}</th>
+          {% endfor %}
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for obj in objects %}
+        <tr>
+            <td><input class="row-checkbox" type="checkbox" value="{{ obj.pk }}"></td>
+            {% for field in model_fields|slice:":3" %}
+              <td>{{ obj|attr:field.name }}</td>
+            {% endfor %}
+          {% endfor %}
+          <td>
+            {% if detail_url_name and can_view %}
+              <a class="btn btn-sm btn-outline-primary" href="{% url detail_url_name obj.pk %}">View</a>
+            {% endif %}
+            {% if obj.pk and can_change %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'manager:'|add:model_name|add:'_edit' obj.pk %}">Edit</a>
+            {% endif %}
+            {% if obj.pk and can_delete %}
+              <a class="btn btn-sm btn-outline-danger" href="{% url 'manager:'|add:model_name|add:'_delete' obj.pk %}">Delete</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No objects found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if is_paginated %}
+      <nav>
+        <ul class="pagination">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+          {% endif %}
+          <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

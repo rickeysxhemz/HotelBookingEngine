@@ -6,9 +6,6 @@ import os
 # Security middleware configuration for production
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'core.security_middleware.SecurityHeadersMiddleware',
-    'core.security_middleware.RequestSizeMiddleware', 
-    'core.security_middleware.SuspiciousRequestMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
