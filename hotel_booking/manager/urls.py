@@ -1,11 +1,12 @@
 from django.urls import path
-from . import views
+
 from . import views_cbv
 
 app_name = 'manager'
 
 urlpatterns = [
-    path('', views.dashboard, name='dashboard'),
+    path('login/', views_cbv.ManagerLoginView.as_view(), name='login'),
+    path('', views_cbv.DashboardView.as_view(), name='dashboard'),
     # Hotels
     path('hotels/', views_cbv.HotelListView.as_view(), name='hotels'),
     path('hotels/add/', views_cbv.HotelCreateView.as_view(), name='hotel_add'),

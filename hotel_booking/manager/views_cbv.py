@@ -2,8 +2,18 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, View
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib import messages
-from django.shortcuts import redirect
+from django.shortcuts import render, redirect
+from django.contrib.auth import logout, authenticate, login
+from django.utils import timezone
+from django.http import HttpResponse
+import csv
 
+from core.models import Hotel, Room, RoomType, Extra, SeasonalPricing, RoomAmenity, RoomImage, RoomTypeAmenity
+from bookings.models import Booking, BookingExtra, BookingGuest, BookingHistory
+from .forms import (
+    HotelForm, RoomForm, RoomTypeForm, ExtraForm, SeasonalPricingForm, BookingForm,
+    BookingExtraForm, BookingGuestForm, BookingHistoryForm, RoomAmenityForm, RoomImageForm, RoomTypeAmenityForm
+)
 from core.models import Hotel, Room, RoomType, Extra, SeasonalPricing
 from bookings.models import Booking
 from .forms import HotelForm, RoomForm, RoomTypeForm, ExtraForm, SeasonalPricingForm, BookingForm
@@ -14,10 +24,113 @@ from django.http import HttpResponse
 import csv
 
 
-class ManagerRequiredMixin(UserPassesTestMixin):
-    def test_func(self):
-        return self.request.user.groups.filter(name='Manager').exists() or self.request.user.is_superuser
+from django.contrib.auth import logout
+from django.shortcuts import redirect
 
+
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth import logout, authenticate, login
+from django.contrib import messages
+from django.views import View
+from django.utils.decorators import method_decorator
+from django.utils import timezone
+
+from bookings.models import Booking
+from core.models import Hotel, Room, Extra
+from django.contrib.auth.forms import AuthenticationForm
+
+
+class ManagerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Mixin to ensure only managers can access the view."""
+    
+    def test_func(self):
+        user = self.request.user
+        user_type = getattr(user, 'user_type', None)
+        
+        # Check if user is staff with correct user_type and not admin/superuser
+        return (user.is_authenticated and 
+                user.is_staff and 
+                user_type == 'staff' and 
+                not user.is_superuser and 
+                user_type != 'admin')
+    
+    def handle_no_permission(self):
+        logout(self.request)
+        messages.error(self.request, 'This dashboard is only for Managers')
+        return redirect('manager:login')
+
+
+class ManagerLoginView(View):
+    """
+    Custom login view for managers only.
+    Only allows users with user_type 'staff' and is_staff=True to login.
+    Blocks admin users (user_type 'admin' or is_superuser=True).
+    """
+    
+    def get(self, request):
+        form = AuthenticationForm()
+        return render(request, 'manager/login.html', {'form': form})
+    
+    def post(self, request):
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            
+            # Authenticate the user
+            user = authenticate(request, username=username, password=password)
+            
+            if user is not None:
+                # Check if user is staff and has correct user_type
+                user_type = getattr(user, 'user_type', None)
+                
+                if (user.is_staff and 
+                    user_type == 'staff' and 
+                    not user.is_superuser and 
+                    user_type != 'admin'):
+                    login(request, user)
+                    return redirect('manager:dashboard')
+                else:
+                    messages.error(request, 'This dashboard is only for Managers. Admin users cannot access this portal.')
+            else:
+                messages.error(request, 'Invalid username or password.')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+        
+        return render(request, 'manager/login.html', {'form': form})
+
+
+class DashboardView(ManagerRequiredMixin, View):
+    """Enhanced dashboard with quick stats for the manager UI."""
+    
+    def get(self, request):
+        today = timezone.now().date()
+        total_bookings = Booking.objects.count()
+        new_bookings = Booking.objects.filter(booking_date__date=today).count()
+        checked_in = Booking.objects.filter(status='checked_in').count()
+        upcoming = Booking.objects.filter(check_in__gte=today).count()
+
+        hotels_count = Hotel.objects.count()
+        rooms_count = Room.objects.count()
+        extras_count = Extra.objects.count()
+
+        recent_bookings = Booking.objects.order_by('-booking_date')[:8]
+
+        context = {
+            'total_bookings': total_bookings,
+            'new_bookings': new_bookings,
+            'checked_in': checked_in,
+            'upcoming': upcoming,
+            'hotels_count': hotels_count,
+            'rooms_count': rooms_count,
+            'extras_count': extras_count,
+            'recent_bookings': recent_bookings,
+        }
+
+        return render(request, 'manager/dashboard.html', context)
+    
 
 class ModelContextMixin:
     """Provide safe template-friendly model metadata in the context to avoid accessing _meta from templates."""
@@ -36,7 +149,7 @@ class ModelContextMixin:
         return ctx
 
 
-class BaseListView(ModelContextMixin, LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class BaseListView(ModelContextMixin, ManagerRequiredMixin, PermissionRequiredMixin, ListView):
     paginate_by = 20
 
     def handle_no_permission(self):

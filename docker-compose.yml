@@ -15,20 +15,21 @@ services:
 
   web:
     build: .
-    command: >
-      sh -c "cd /app/hotel_booking &&
-             python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn hotel_booking.wsgi:application --bind 0.0.0.0:8000 --timeout 120 --workers 2"
-    working_dir: /app
+    entrypoint: ["/app/entrypoint.sh"]
+    command: ["gunicorn", "hotel_booking.wsgi:application", "--bind", "0.0.0.0:8000", "--timeout", "120", "--workers", "2"]
+    working_dir: /app/hotel_booking
     volumes:
       - static_volume:/app/hotel_booking/staticfiles
       - media_volume:/app/media
       - logs_volume:/app/logs
+      - ./entrypoint.sh:/app/entrypoint.sh
     env_file:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=hotel_booking.deployment
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
