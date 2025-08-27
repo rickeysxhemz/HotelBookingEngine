@@ -58,7 +58,6 @@ class ManagerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     
     def handle_no_permission(self):
         logout(self.request)
-        messages.error(self.request, 'This dashboard is only for Managers')
         return redirect('manager:login')
 
 

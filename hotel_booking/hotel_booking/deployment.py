@@ -15,6 +15,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+
 # --- Production-specific overrides ---
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 SECRET_KEY = os.environ.get('SECRET_KEY')  # No fallback - MUST be set in environment

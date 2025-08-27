@@ -1,5 +1,5 @@
+
 from django.contrib import admin
-# manager admin removed; only default admin is used
 from django.urls import path, include
 from django.http import JsonResponse
 from core.health import health_check
@@ -35,12 +35,11 @@ urlpatterns = [
     path('api/v1/bookings/', include('bookings.urls')),
 ]
 
+
 if HAS_SPECTACULAR:
     urlpatterns += [
-        # API schema endpoint
         path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
-        # Swagger UI endpoint
         path('api/v1/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-        # Redoc UI endpoint
         path('api/v1/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     ]
+

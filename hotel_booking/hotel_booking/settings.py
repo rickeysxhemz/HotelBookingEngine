@@ -118,7 +118,11 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', defaul
 SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=True, cast=bool)
 
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # Added for production
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Used in production
+
+# In development, add app static dirs for static file serving
+if DEBUG:
+    STATICFILES_DIRS = [BASE_DIR / 'hotel_booking' / 'manager' / 'static']
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
