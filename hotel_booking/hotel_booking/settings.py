@@ -1,3 +1,7 @@
+# Authentication backends: use custom email backend and Django's default
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
 import os
 from pathlib import Path
 from datetime import timedelta

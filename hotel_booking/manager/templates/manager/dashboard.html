@@ -1,5 +1,5 @@
 {% extends 'manager/base.html' %}
-{% load manager_extras %}
+{% load status_color %}
 
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}Dashboard overview{% endblock %}
@@ -57,26 +57,112 @@
     </div>
   </div>
 
+
   <div class="col-12 col-lg-4">
     <div class="card">
       <div class="card-header">
-        <h5 class="card-title mb-0">Inventory</h5>
+        <h5 class="card-title mb-0">Entities & Quick Links</h5>
       </div>
       <div class="card-body">
-        <div class="row text-center">
-          <div class="col-4">
-            <div class="fs-3 fw-bold">{{ hotels_count }}</div>
-            <div class="small text-muted">Hotels</div>
-          </div>
-          <div class="col-4">
-            <div class="fs-3 fw-bold">{{ rooms_count }}</div>
-            <div class="small text-muted">Rooms</div>
-          </div>
-          <div class="col-4">
-            <div class="fs-3 fw-bold">{{ extras_count }}</div>
-            <div class="small text-muted">Extras</div>
-          </div>
-        </div>
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Entity</th>
+              <th>Count</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Hotels</td>
+              <td>{{ hotels_count }}</td>
+              <td>
+                {% if perms.hotel.view %}<a href="{% url 'manager:hotels' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.hotel.add %}<a href="{% url 'manager:hotel_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Rooms</td>
+              <td>{{ rooms_count }}</td>
+              <td>
+                {% if perms.room.view %}<a href="{% url 'manager:rooms' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.room.add %}<a href="{% url 'manager:room_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Room Types</td>
+              <td>{{ roomtypes_count }}</td>
+              <td>
+                {% if perms.roomtype.view %}<a href="{% url 'manager:roomtypes' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.roomtype.add %}<a href="{% url 'manager:roomtype_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Extras</td>
+              <td>{{ extras_count }}</td>
+              <td>
+                {% if perms.extra.view %}<a href="{% url 'manager:extras' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.extra.add %}<a href="{% url 'manager:extra_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Room Amenities</td>
+              <td>{{ roomamenities_count }}</td>
+              <td>
+                {% if perms.roomamenity.view %}<a href="{% url 'manager:roomamenities' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.roomamenity.add %}<a href="{% url 'manager:roomamenity_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Room Images</td>
+              <td>{{ roomimages_count }}</td>
+              <td>
+                {% if perms.roomimage.view %}<a href="{% url 'manager:roomimages' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.roomimage.add %}<a href="{% url 'manager:roomimage_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Room Type Amenities</td>
+              <td>{{ roomtypeamenities_count }}</td>
+              <td>
+                {% if perms.roomtypeamenity.view %}<a href="{% url 'manager:roomtypeamenities' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.roomtypeamenity.add %}<a href="{% url 'manager:roomtypeamenity_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Seasonal Pricing</td>
+              <td>{{ seasonalpricing_count }}</td>
+              <td>
+                {% if perms.seasonalpricing.view %}<a href="{% url 'manager:seasonalpricing' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.seasonalpricing.add %}<a href="{% url 'manager:seasonalpricing_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Booking Extras</td>
+              <td>{{ bookingextras_count }}</td>
+              <td>
+                {% if perms.bookingextra.view %}<a href="{% url 'manager:bookingextras' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.bookingextra.add %}<a href="{% url 'manager:bookingextra_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Booking Guests</td>
+              <td>{{ bookingguests_count }}</td>
+              <td>
+                {% if perms.bookingguest.view %}<a href="{% url 'manager:bookingguests' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.bookingguest.add %}<a href="{% url 'manager:bookingguest_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Booking Histories</td>
+              <td>{{ bookinghistories_count }}</td>
+              <td>
+                {% if perms.bookinghistory.view %}<a href="{% url 'manager:bookinghistories' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.bookinghistory.add %}<a href="{% url 'manager:bookinghistory_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

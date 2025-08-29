@@ -39,7 +39,6 @@ from django.utils import timezone
 
 from bookings.models import Booking
 from core.models import Hotel, Room, Extra
-from django.contrib.auth.forms import AuthenticationForm
 
 
 class ManagerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -69,36 +68,28 @@ class ManagerLoginView(View):
     """
     
     def get(self, request):
-        form = AuthenticationForm()
-        return render(request, 'manager/login.html', {'form': form})
-    
+        # Render a simple form with email and password fields
+        return render(request, 'manager/login.html', {'form': None})
+
     def post(self, request):
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            
-            # Authenticate the user
-            user = authenticate(request, username=username, password=password)
-            
-            if user is not None:
-                # Check if user is staff and has correct user_type
+        from django.contrib.auth import authenticate
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        user = authenticate(request, username=email, password=password)
+        if user is not None:
+            if user.is_active:
                 user_type = getattr(user, 'user_type', None)
-                
-                if (user.is_staff and 
-                    user_type == 'staff' and 
-                    not user.is_superuser and 
-                    user_type != 'admin'):
+                if user.is_staff and user_type == 'staff' and not user.is_superuser and user_type != 'admin':
                     login(request, user)
+                    messages.success(request, 'Login successful. Welcome, Manager!')
                     return redirect('manager:dashboard')
                 else:
-                    messages.error(request, 'This dashboard is only for Managers. Admin users cannot access this portal.')
+                    messages.error(request, 'Access denied: Only staff managers can log in here.')
             else:
-                messages.error(request, 'Invalid username or password.')
+                messages.error(request, 'This account is inactive.')
         else:
-            messages.error(request, 'Please correct the errors below.')
-        
-        return render(request, 'manager/login.html', {'form': form})
+            messages.error(request, 'Invalid email or password.')
+        return render(request, 'manager/login.html', {'form': None})
 
 
 class DashboardView(ManagerRequiredMixin, View):
@@ -106,28 +97,107 @@ class DashboardView(ManagerRequiredMixin, View):
     
     def get(self, request):
         today = timezone.now().date()
+        user = request.user
+        # Booking stats
         total_bookings = Booking.objects.count()
         new_bookings = Booking.objects.filter(booking_date__date=today).count()
         checked_in = Booking.objects.filter(status='checked_in').count()
         upcoming = Booking.objects.filter(check_in__gte=today).count()
+        recent_bookings = Booking.objects.order_by('-booking_date')[:8]
 
+        # Core entities
         hotels_count = Hotel.objects.count()
         rooms_count = Room.objects.count()
         extras_count = Extra.objects.count()
+        roomtypes_count = RoomType.objects.count()
+        roomamenities_count = RoomAmenity.objects.count()
+        roomimages_count = RoomImage.objects.count()
+        roomtypeamenities_count = RoomTypeAmenity.objects.count()
+        seasonalpricing_count = SeasonalPricing.objects.count()
 
-        recent_bookings = Booking.objects.order_by('-booking_date')[:8]
+        # Bookings related
+        bookingextras_count = BookingExtra.objects.count()
+        bookingguests_count = BookingGuest.objects.count()
+        bookinghistories_count = BookingHistory.objects.count()
+
+        # Permissions for quick links
+        perms = {
+            'hotel': {
+                'add': user.has_perm('core.add_hotel'),
+                'view': user.has_perm('core.view_hotel'),
+                'change': user.has_perm('core.change_hotel'),
+            },
+            'room': {
+                'add': user.has_perm('core.add_room'),
+                'view': user.has_perm('core.view_room'),
+                'change': user.has_perm('core.change_room'),
+            },
+            'roomtype': {
+                'add': user.has_perm('core.add_roomtype'),
+                'view': user.has_perm('core.view_roomtype'),
+                'change': user.has_perm('core.change_roomtype'),
+            },
+            'extra': {
+                'add': user.has_perm('core.add_extra'),
+                'view': user.has_perm('core.view_extra'),
+                'change': user.has_perm('core.change_extra'),
+            },
+            'roomamenity': {
+                'add': user.has_perm('core.add_roomamenity'),
+                'view': user.has_perm('core.view_roomamenity'),
+                'change': user.has_perm('core.change_roomamenity'),
+            },
+            'roomimage': {
+                'add': user.has_perm('core.add_roomimage'),
+                'view': user.has_perm('core.view_roomimage'),
+                'change': user.has_perm('core.change_roomimage'),
+            },
+            'roomtypeamenity': {
+                'add': user.has_perm('core.add_roomtypeamenity'),
+                'view': user.has_perm('core.view_roomtypeamenity'),
+                'change': user.has_perm('core.change_roomtypeamenity'),
+            },
+            'seasonalpricing': {
+                'add': user.has_perm('core.add_seasonalpricing'),
+                'view': user.has_perm('core.view_seasonalpricing'),
+                'change': user.has_perm('core.change_seasonalpricing'),
+            },
+            'bookingextra': {
+                'add': user.has_perm('bookings.add_bookingextra'),
+                'view': user.has_perm('bookings.view_bookingextra'),
+                'change': user.has_perm('bookings.change_bookingextra'),
+            },
+            'bookingguest': {
+                'add': user.has_perm('bookings.add_bookingguest'),
+                'view': user.has_perm('bookings.view_bookingguest'),
+                'change': user.has_perm('bookings.change_bookingguest'),
+            },
+            'bookinghistory': {
+                'add': user.has_perm('bookings.add_bookinghistory'),
+                'view': user.has_perm('bookings.view_bookinghistory'),
+                'change': user.has_perm('bookings.change_bookinghistory'),
+            },
+        }
 
         context = {
             'total_bookings': total_bookings,
             'new_bookings': new_bookings,
             'checked_in': checked_in,
             'upcoming': upcoming,
+            'recent_bookings': recent_bookings,
             'hotels_count': hotels_count,
             'rooms_count': rooms_count,
             'extras_count': extras_count,
-            'recent_bookings': recent_bookings,
+            'roomtypes_count': roomtypes_count,
+            'roomamenities_count': roomamenities_count,
+            'roomimages_count': roomimages_count,
+            'roomtypeamenities_count': roomtypeamenities_count,
+            'seasonalpricing_count': seasonalpricing_count,
+            'bookingextras_count': bookingextras_count,
+            'bookingguests_count': bookingguests_count,
+            'bookinghistories_count': bookinghistories_count,
+            'perms': perms,
         }
-
         return render(request, 'manager/dashboard.html', context)
     
 

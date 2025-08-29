@@ -1,5 +1,5 @@
 <!doctype html>
-{% load static manager_tags %}
+{% load static %}
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -15,7 +15,7 @@
       <!-- Sidebar -->
       <div class="bg-dark border-end" id="sidebar-wrapper">
         <div class="sidebar-heading">
-          <i class="fa-solid fa-hotel me-2"></i>
+          <img src="{% static 'manager/logo-BUdpEPsg.svg' %}" alt="Hotel Logo" style="width:36px; height:36px; margin-right:0.75rem; vertical-align:middle;">
           <span>Hotel Manager</span>
         </div>
         <div class="list-group list-group-flush">
