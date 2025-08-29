@@ -4,6 +4,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import (LoginRequiredMixin,
                                         PermissionRequiredMixin,
                                         UserPassesTestMixin)
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
@@ -317,6 +318,7 @@ class HotelListView(BulkActionMixin, BaseListView):
     template_name = 'manager/list.html'
     context_object_name = 'objects'
     permission_required = 'core.view_hotel'
+
 
 
 class RoomTypeListView(BulkActionMixin, BaseListView):
@@ -694,3 +696,106 @@ class BookingDeleteView(BaseDeleteView):
     template_name = 'manager/confirm_delete.html'
     success_url = reverse_lazy('manager:bookings')
     permission_required = 'bookings.delete_booking'
+
+
+class GlobalSearchView(ManagerRequiredMixin, View):
+    """Global search view that searches across multiple models"""
+    
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        
+        if not query:
+            return render(request, 'manager/search_results.html', {
+                'query': query,
+                'results': {},
+                'total_results': 0
+            })
+        
+        results = {}
+        total_results = 0
+        
+        # Search Bookings
+        if request.user.has_perm('bookings.view_booking'):
+            bookings = Booking.objects.filter(
+                Q(booking_reference__icontains=query) |
+                Q(primary_guest_name__icontains=query) |
+                Q(primary_guest_email__icontains=query) |
+                Q(primary_guest_phone__icontains=query)
+            )[:10]
+            if bookings.exists():
+                results['bookings'] = {
+                    'objects': bookings,
+                    'count': bookings.count(),
+                    'verbose_name': Booking._meta.verbose_name_plural,
+                    'url_name': 'manager:bookings'
+                }
+                total_results += bookings.count()
+        
+        # Search Hotels
+        if request.user.has_perm('core.view_hotel'):
+            hotels = Hotel.objects.filter(
+                Q(name__icontains=query) |
+                Q(address__icontains=query) |
+                Q(city__icontains=query)
+            )[:10]
+            if hotels.exists():
+                results['hotels'] = {
+                    'objects': hotels,
+                    'count': hotels.count(),
+                    'verbose_name': Hotel._meta.verbose_name_plural,
+                    'url_name': 'manager:hotels'
+                }
+                total_results += hotels.count()
+        
+        # Search Rooms
+        if request.user.has_perm('core.view_room'):
+            rooms = Room.objects.filter(
+                Q(room_number__icontains=query) |
+                Q(room_type__name__icontains=query)
+            )[:10]
+            if rooms.exists():
+                results['rooms'] = {
+                    'objects': rooms,
+                    'count': rooms.count(),
+                    'verbose_name': Room._meta.verbose_name_plural,
+                    'url_name': 'manager:rooms'
+                }
+                total_results += rooms.count()
+        
+        # Search Room Types
+        if request.user.has_perm('core.view_roomtype'):
+            room_types = RoomType.objects.filter(
+                Q(name__icontains=query) |
+                Q(description__icontains=query)
+            )[:10]
+            if room_types.exists():
+                results['room_types'] = {
+                    'objects': room_types,
+                    'count': room_types.count(),
+                    'verbose_name': RoomType._meta.verbose_name_plural,
+                    'url_name': 'manager:roomtypes'
+                }
+                total_results += room_types.count()
+        
+        # Search Extras
+        if request.user.has_perm('core.view_extra'):
+            extras = Extra.objects.filter(
+                Q(name__icontains=query) |
+                Q(description__icontains=query)
+            )[:10]
+            if extras.exists():
+                results['extras'] = {
+                    'objects': extras,
+                    'count': extras.count(),
+                    'verbose_name': Extra._meta.verbose_name_plural,
+                    'url_name': 'manager:extras'
+                }
+                total_results += extras.count()
+        
+        context = {
+            'query': query,
+            'results': results,
+            'total_results': total_results
+        }
+        
+        return render(request, 'manager/search_results.html', context)

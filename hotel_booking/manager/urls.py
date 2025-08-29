@@ -84,4 +84,7 @@ urlpatterns = [
     path('seasonal-pricing/<uuid:pk>/edit/', views_cbv.SeasonalPricingUpdateView.as_view(), name='seasonalpricing_edit'),
     path('seasonal-pricing/<uuid:pk>/delete/', views_cbv.SeasonalPricingDeleteView.as_view(), name='seasonalpricing_delete'),
     path('seasonal-pricing/bulk-delete/', views_cbv.SeasonalPricingListView.as_view(), name='seasonalpricing_bulk_delete'),
+
+    # Global search
+    path('search/', views_cbv.GlobalSearchView.as_view(), name='global_search'),
 ]
