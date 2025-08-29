@@ -17,7 +17,7 @@
   </div>
 
   <div class="card-body">
-    <div class="row mb-3">
+    {% comment %} <div class="row mb-3">
       <div class="col-12 col-md-6">
         <form method="get" class="d-flex">
           <input name="q" class="form-control me-2" placeholder="Search..." value="{{ request.GET.q }}">
@@ -32,7 +32,7 @@
           <button id="bulkDelete" class="btn btn-sm btn-danger">Delete Selected</button>
         {% endif %}
       </div>
-    </div>
+    </div> {% endcomment %}
 
     <div class="table-responsive">
       <table class="table table-hover align-middle">

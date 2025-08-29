@@ -240,7 +240,14 @@ class BaseListView(ModelContextMixin, ManagerRequiredMixin, PermissionRequiredMi
         ctx = super().get_context_data(**kwargs)
         model_name = self.model._meta.model_name
         ctx['add_url_name'] = f'manager:{model_name}_add'
-        ctx['detail_url_name'] = f'manager:{model_name}_detail'
+        
+        # Only set detail_url_name for models that have detail views
+        # Currently only Booking has a detail view
+        if model_name == 'booking':
+            ctx['detail_url_name'] = f'manager:{model_name}_detail'
+        else:
+            ctx['detail_url_name'] = None
+            
         ctx['model_verbose_name'] = self.model._meta.verbose_name
         ctx['model_verbose_name_plural'] = self.model._meta.verbose_name_plural
         # Permission flags for UI
@@ -735,7 +742,8 @@ class GlobalSearchView(ManagerRequiredMixin, View):
         if request.user.has_perm('core.view_hotel'):
             hotels = Hotel.objects.filter(
                 Q(name__icontains=query) |
-                Q(address__icontains=query) |
+                Q(address_line_1__icontains=query) |
+                Q(address_line_2__icontains=query) |
                 Q(city__icontains=query)
             )[:10]
             if hotels.exists():
