@@ -1,34 +1,60 @@
 {% extends 'manager/base.html' %}
-{% block title %}Form{% endblock %}
+{% load core_tags %}
+
+{% block title %}{% if object %}Edit{% else %}Create{% endif %} {{ model_verbose_name|title }}{% endblock %}
+
+{% block page_title %}{% if object %}Edit{% else %}Create{% endif %} {{ model_verbose_name|title }}{% endblock %}
+
 {% block content %}
-<div class="card shadow-sm" style="max-width: 480px; margin: 2rem auto; border-radius: 1.1rem;">
-  <div class="card-body p-4">
-    <h5 class="card-title mb-3" style="font-weight: 700;">{{ model_verbose_name|title }}</h5>
-    <form method="post" novalidate>
-      {% csrf_token %}
-      <div class="row g-3">
-        {% for field in form.visible_fields %}
-          <div class="col-12">
-            <div class="form-floating">
-              {{ field }}
-              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {% if field.errors %}
-                <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
-              {% endif %}
-            </div>
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">{% if object %}Editing{% else %}Creating{% endif %} {{ model_verbose_name|title }}</h5>
+      </div>
+      <div class="card-body">
+        <form method="post" novalidate enctype="multipart/form-data">
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <div class="row g-3">
+            {% for field in form %}
+              <div class="col-12 {% if field.field.widget.attrs.full_width %}col-lg-12{% else %}col-lg-6{% endif %}">
+                {% if field|is_checkbox %}
+                  <div class="form-check">
+                    {{ field }}
+                    <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  </div>
+                {% else %}
+                  <div class="form-floating">
+                    {{ field }}
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  </div>
+                {% endif %}
+                {% if field.errors %}
+                  <div class="invalid-feedback d-block">
+                    {{ field.errors|striptags }}
+                  </div>
+                {% endif %}
+                {% if field.help_text %}
+                  <div class="form-text">{{ field.help_text|safe }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
           </div>
-        {% endfor %}
+
+          <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
+            <a class="btn btn-secondary" href="{{ request.META.HTTP_REFERER|default:'/' }}">Cancel</a>
+            <button class="btn btn-primary" type="submit">
+              <i class="fa-solid fa-save me-1"></i> Save Changes
+            </button>
+          </div>
+        </form>
       </div>
-      {% if form.non_field_errors %}
-        <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
-      {% endif %}
-      <div class="mt-4 d-flex gap-2">
-        {% if view.action == 'create' and can_add or view.action == 'update' and can_change %}
-          <button class="btn btn-login flex-fill" type="submit">Save</button>
-        {% endif %}
-        <a class="btn btn-secondary flex-fill" href="{{ request.META.HTTP_REFERER|default:'/' }}">Cancel</a>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
 {% endblock %}

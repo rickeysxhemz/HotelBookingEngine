@@ -20,18 +20,22 @@
         </div>
         <div class="list-group list-group-flush">
           {% sidebar_link 'manager:dashboard' 'fa-gauge' 'Dashboard' %}
-          {% if can_view %}
-            {% sidebar_link 'manager:bookings' 'fa-calendar-check' 'Bookings' %}
-          {% endif %}
-          {% if perms.core.view_hotel or can_view %}
-            {% sidebar_link 'manager:hotels' 'fa-building' 'Hotels' %}
-          {% endif %}
-          {% if perms.core.view_room or can_view %}
-            {% sidebar_link 'manager:rooms' 'fa-bed' 'Rooms' %}
-          {% endif %}
-          {% if perms.core.view_extra or can_view %}
-            {% sidebar_link 'manager:extras' 'fa-boxes-stacked' 'Extras' %}
-          {% endif %}
+
+          <div class="sidebar-heading-divider">Bookings</div>
+          {% sidebar_link 'manager:bookings' 'fa-calendar-check' 'Bookings' %}
+          {% sidebar_link 'manager:bookingguests' 'fa-users' 'Guests' %}
+          {% sidebar_link 'manager:bookingextras' 'fa-plus-square' 'Booking Extras' %}
+          {% sidebar_link 'manager:bookinghistories' 'fa-history' 'Booking History' %}
+
+          <div class="sidebar-heading-divider">Hotel Setup</div>
+          {% sidebar_link 'manager:hotels' 'fa-building' 'Hotels' %}
+          {% sidebar_link 'manager:roomtypes' 'fa-layer-group' 'Room Types' %}
+          {% sidebar_link 'manager:rooms' 'fa-bed' 'Rooms' %}
+          {% sidebar_link 'manager:roomamenities' 'fa-star' 'Room Amenities' %}
+          {% sidebar_link 'manager:roomimages' 'fa-image' 'Room Images' %}
+          {% sidebar_link 'manager:roomtypeamenities' 'fa-tags' 'Room Type Amenities' %}
+          {% sidebar_link 'manager:extras' 'fa-boxes-stacked' 'Extras' %}
+          {% sidebar_link 'manager:seasonalpricing' 'fa-dollar-sign' 'Seasonal Pricing' %}
         </div>
       </div>
       <!-- /#sidebar-wrapper -->
