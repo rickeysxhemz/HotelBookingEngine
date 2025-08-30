@@ -11,6 +11,8 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import (CreateView, DeleteView, DetailView, ListView,
                                   UpdateView, View)
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 
 from bookings.models import Booking, BookingExtra, BookingGuest, BookingHistory
 from core.models import (Extra, Hotel, Room, RoomAmenity, RoomImage, RoomType,
@@ -51,30 +53,66 @@ class ManagerLoginView(View):
     Custom login view for managers only.
     Only allows users with user_type 'staff' and is_staff=True to login.
     Blocks admin users (user_type 'admin' or is_superuser=True).
+    Includes rate limiting and failed login tracking.
     """
-    
-    def get(self, request):
-        # Render a simple form with email and password fields
-        return render(request, 'manager/login.html', {'form': None})
 
+    @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request):
         from django.contrib.auth import authenticate
+        from accounts.models import CustomUser
+
         email = request.POST.get('email')
         password = request.POST.get('password')
-        user = authenticate(request, username=email, password=password)
-        if user is not None:
-            if user.is_active:
-                user_type = getattr(user, 'user_type', None)
-                if user.is_staff and user_type == 'staff' and not user.is_superuser and user_type != 'admin':
-                    login(request, user)
-                    messages.success(request, 'Login successful. Welcome, Manager!')
-                    return redirect('manager:dashboard')
+
+        # Generic error message to prevent user enumeration
+        error_message = 'Invalid credentials. Please check your email and password.'
+
+        if not email or not password:
+            messages.error(request, error_message)
+            return render(request, 'manager/login.html', {'form': None})
+
+        try:
+            user = CustomUser.objects.get(email=email)
+            # Track failed login attempts
+            if user.failed_login_attempts >= 5:
+                messages.error(request, 'Account temporarily locked due to too many failed attempts.')
+                return render(request, 'manager/login.html', {'form': None})
+
+            authenticated_user = authenticate(request, username=email, password=password)
+
+            if authenticated_user is not None:
+                if authenticated_user.is_active:
+                    user_type = getattr(authenticated_user, 'user_type', None)
+                    if (authenticated_user.is_staff and
+                        user_type == 'staff' and
+                        not authenticated_user.is_superuser and
+                        user_type != 'admin'):
+
+                        # Reset failed login attempts on successful login
+                        authenticated_user.failed_login_attempts = 0
+                        authenticated_user.save(update_fields=['failed_login_attempts'])
+
+                        login(request, authenticated_user)
+                        messages.success(request, 'Login successful. Welcome, Manager!')
+                        return redirect('manager:dashboard')
+                    else:
+                        messages.error(request, error_message)
                 else:
-                    messages.error(request, 'Access denied: Only staff managers can log in here.')
+                    messages.error(request, error_message)
             else:
-                messages.error(request, 'This account is inactive.')
-        else:
-            messages.error(request, 'Invalid email or password.')
+                # Increment failed login attempts
+                user.failed_login_attempts += 1
+                user.save(update_fields=['failed_login_attempts'])
+                messages.error(request, error_message)
+
+        except CustomUser.DoesNotExist:
+            # Don't reveal that email doesn't exist
+            messages.error(request, error_message)
+
+        return render(request, 'manager/login.html', {'form': None})
+
+    def get(self, request):
+        # Render a simple form with email and password fields
         return render(request, 'manager/login.html', {'form': None})
 
 

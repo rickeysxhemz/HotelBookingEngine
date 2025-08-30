@@ -113,6 +113,10 @@ CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 
+# Set session cookie age to 1 hour (3600 seconds)
+
+SESSION_COOKIE_AGE = 15 * 24 * 60 * 60
+
 # Enable these in production with HTTPS
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
 CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)
