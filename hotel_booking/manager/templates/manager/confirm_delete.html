@@ -1,0 +1,34 @@
+{% extends 'manager/base.html' %}
+
+{% block title %}Confirm Deletion{% endblock %}
+
+{% block page_title %}Confirm Deletion{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-6">
+    <div class="card text-center">
+      <div class="card-header">
+        <h5 class="card-title mb-0">Confirm Deletion</h5>
+      </div>
+      <div class="card-body">
+        <p class="fs-5">Are you sure you want to delete the {{ model_verbose_name }}:</p>
+        <p class="lead fw-bold">"{{ object }}"</p>
+        <p class="text-danger">This action cannot be undone.</p>
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="d-grid gap-2 d-md-flex justify-content-center">
+            <button type="submit" class="btn btn-danger">
+              <i class="fa-solid fa-trash-alt me-1"></i> Yes, Delete
+            </button>
+            <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="btn btn-secondary">
+              <i class="fa-solid fa-times me-1"></i> Cancel
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

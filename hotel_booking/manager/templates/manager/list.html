@@ -1,0 +1,105 @@
+{% extends 'manager/base.html' %}
+{% load core_tags %}
+
+{% block title %}{{ model_verbose_name_plural|title }}{% endblock %}
+
+{% block page_title %}{{ model_verbose_name_plural|title }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h5 class="card-title mb-0">{{ model_verbose_name_plural|title }} List</h5>
+    {% if add_url_name and can_add %}
+      <a class="btn btn-primary btn-sm" href="{% url add_url_name %}">
+        <i class="fa-solid fa-plus me-1"></i> Add New
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="card-body">
+    {% comment %} <div class="row mb-3">
+      <div class="col-12 col-md-6">
+        <form method="get" class="d-flex">
+          <input name="q" class="form-control me-2" placeholder="Search..." value="{{ request.GET.q }}">
+          <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+      </div>
+      <div class="col-12 col-md-6 text-md-end mt-2 mt-md-0">
+        {% if can_view %}
+          <button id="bulkExport" class="btn btn-sm btn-outline-secondary">Export Selected</button>
+        {% endif %}
+        {% if can_delete %}
+          <button id="bulkDelete" class="btn btn-sm btn-danger">Delete Selected</button>
+        {% endif %}
+      </div>
+    </div> {% endcomment %}
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 3%;"><input id="selectAll" type="checkbox" class="form-check-input"></th>
+            {% for field in model_fields|slice:":4" %}
+              <th>{{ field.verbose_name|title }}</th>
+            {% endfor %}
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for obj in object_list %}
+          <tr>
+            <td><input class="row-checkbox form-check-input" type="checkbox" value="{{ obj.pk }}"></td>
+            {% for field in model_fields|slice:":4" %}
+              <td>{{ obj|attr:field.name }}</td>
+            {% endfor %}
+            <td class="text-end">
+              <div class="btn-group">
+                {% if detail_url_name and can_view %}
+                  <a class="btn btn-sm btn-outline-primary" href="{% url detail_url_name obj.pk %}"><i class="fa-solid fa-eye"></i></a>
+                {% endif %}
+                {% if obj.pk and can_change %}
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'manager:'|add:model_name|add:'_edit' obj.pk %}"><i class="fa-solid fa-pencil"></i></a>
+                {% endif %}
+                {% if obj.pk and can_delete %}
+                  <a class="btn btn-sm btn-outline-danger" href="{% url 'manager:'|add:model_name|add:'_delete' obj.pk %}"><i class="fa-solid fa-trash"></i></a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="{{ model_fields|slice:':4'|length|add:2 }}" class="text-center">No {{ model_verbose_name_plural }} found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if is_paginated %}
+  <div class="card-footer">
+    <nav aria-label="Page navigation">
+      <ul class="pagination justify-content-center mb-0">
+        {% if page_obj.has_previous %}
+          <li class="page-item"><a class="page-link" href="?page=1">&laquo; First</a></li>
+          <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">&laquo; First</span></li>
+          <li class="page-item disabled"><span class="page-link">Previous</span></li>
+        {% endif %}
+
+        <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+
+        {% if page_obj.has_next %}
+          <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+          <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last &raquo;</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page--link">Next</span></li>
+          <li class="page-item disabled"><span class="page-link">Last &raquo;</span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

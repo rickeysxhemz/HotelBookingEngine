@@ -1,0 +1,57 @@
+{% extends 'manager/base.html' %}
+{% load core_tags %}
+
+{% block title %}Search Results{% endblock %}
+
+{% block page_title %}Search Results for "{{ query }}"{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h5 class="card-title mb-0">Search Results for "{{ query }}"</h5>
+  </div>
+  <div class="card-body">
+    {% if total_results == 0 %}
+      <p>No results found.</p>
+    {% else %}
+      {% for key, result in results.items %}
+        <h6>{{ result.verbose_name }}</h6>
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Name/Identifier</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for obj in result.objects %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>
+                {% if obj.name %}
+                  {{ obj.name }}
+                {% elif obj.booking_reference %}
+                  {{ obj.booking_reference }}
+                {% elif obj.room_number %}
+                  {{ obj.room_number }}
+                {% else %}
+                  {{ obj }}
+                {% endif %}
+              </td>
+              <td>
+                {% if result.url_name == 'manager:bookings' %}
+                  <a class="btn btn-sm btn-outline-primary" href="{% url 'manager:booking_detail' obj.pk %}"><i class="fa-solid fa-eye"></i></a>
+                {% else %}
+                  <a class="btn btn-sm btn-outline-primary" href="{% url result.url_name %}"><i class="fa-solid fa-eye"></i></a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
