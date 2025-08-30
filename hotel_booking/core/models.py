@@ -21,17 +21,17 @@ class Hotel(TimestampedModel):
     """Hotel model with complete hotel information"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, unique=True)
-    description = models.TextField(blank=True)
+    description = models.TextField(blank=True, null=True)
     address_line_1 = models.CharField(max_length=255)
-    address_line_2 = models.CharField(max_length=255, blank=True)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)
-    country = models.CharField(max_length=100, default='United States')
-    phone_number = models.CharField(max_length=20, blank=True)
+    address_line_2 = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=100, blank=True, null=True)
+    postal_code = models.CharField(max_length=20, blank=True, null=True)
+    country = models.CharField(max_length=100, default='Saudi Arabia')
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField()
-    website = models.URLField(blank=True)
-    
+    website = models.URLField(blank=True, null=True)
+
     # Hotel features
     star_rating = models.PositiveIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(5)],
@@ -80,10 +80,11 @@ class RoomType(TimestampedModel):
     """Room type model with detailed specifications"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
-    short_description = models.CharField(max_length=255, blank=True, help_text='Brief description for listings')
+    description = models.TextField(blank=True, null=True)
+    short_description = models.CharField(max_length=255, blank=True, null=True, help_text='Brief description for listings')
     max_capacity = models.PositiveIntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(10)]
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+        default=1
     )
     
     # Room category
@@ -121,31 +122,31 @@ class RoomType(TimestampedModel):
     room_size_sqft = models.PositiveIntegerField(null=True, blank=True, help_text='Room size in square feet')
     
     # Basic Amenities
-    has_wifi = models.BooleanField(default=True)
-    has_tv = models.BooleanField(default=True)
-    has_air_conditioning = models.BooleanField(default=True)
-    has_heating = models.BooleanField(default=True)
+    has_wifi = models.BooleanField(default=False)
+    has_tv = models.BooleanField(default=False)
+    has_air_conditioning = models.BooleanField(default=False)
+    has_heating = models.BooleanField(default=False)
     has_balcony = models.BooleanField(default=False)
     has_kitchenette = models.BooleanField(default=False)
     has_minibar = models.BooleanField(default=False)
-    has_safe = models.BooleanField(default=True)
-    has_desk = models.BooleanField(default=True)
+    has_safe = models.BooleanField(default=False)
+    has_desk = models.BooleanField(default=False)
     has_seating_area = models.BooleanField(default=False)
     
     # Bathroom amenities
     has_bathtub = models.BooleanField(default=False)
-    has_shower = models.BooleanField(default=True)
-    has_hairdryer = models.BooleanField(default=True)
-    has_toiletries = models.BooleanField(default=True)
-    has_towels = models.BooleanField(default=True)
+    has_shower = models.BooleanField(default=False)
+    has_hairdryer = models.BooleanField(default=False)
+    has_toiletries = models.BooleanField(default=False)
+    has_towels = models.BooleanField(default=False)
     has_bathrobes = models.BooleanField(default=False)
     has_slippers = models.BooleanField(default=False)
     
     # Technology
     has_smart_tv = models.BooleanField(default=False)
     has_streaming_service = models.BooleanField(default=False)
-    has_phone = models.BooleanField(default=True)
-    has_usb_charging = models.BooleanField(default=True)
+    has_phone = models.BooleanField(default=False)
+    has_usb_charging = models.BooleanField(default=False)
     has_bluetooth_speaker = models.BooleanField(default=False)
     
     # Comfort features
@@ -159,7 +160,7 @@ class RoomType(TimestampedModel):
     has_soundproofing = models.BooleanField(default=False)
     
     # Child and extra bed policies
-    children_allowed = models.BooleanField(default=True)
+    children_allowed = models.BooleanField(default=False)
     max_children = models.PositiveIntegerField(default=2)
     infant_bed_available = models.BooleanField(default=False)
     extra_bed_available = models.BooleanField(default=False)
@@ -206,11 +207,12 @@ class RoomType(TimestampedModel):
     # Cancellation policy specific to room type
     cancellation_policy = models.TextField(
         blank=True,
+        null=True,
         help_text='Room type specific cancellation policy'
     )
     
     # Virtual tour and media
-    virtual_tour_url = models.URLField(blank=True, help_text='360° virtual tour URL')
+    virtual_tour_url = models.URLField(blank=True, null=True, help_text='360° virtual tour URL')
     featured_image = models.ImageField(upload_to='room_type_images/', blank=True, null=True, help_text='Main image for this room type')
     
     # Additional amenities (many-to-many relationship will be added after RoomAmenity is defined)
@@ -356,22 +358,24 @@ class Room(TimestampedModel):
     hotel = models.ForeignKey(Hotel, on_delete=models.CASCADE, related_name='rooms')
     room_type = models.ForeignKey(RoomType, on_delete=models.CASCADE, related_name='rooms')
     room_number = models.CharField(max_length=10)
-    floor = models.PositiveIntegerField()
+    floor = models.PositiveIntegerField(default=1)
     
     # Capacity and pricing
     capacity = models.PositiveIntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(10)]
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+        default=1
     )
     base_price = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
+        default=Decimal('0.01'),
         validators=[MinValueValidator(Decimal('0.01'))]
     )
     
     # Status
     is_active = models.BooleanField(default=True)
     is_maintenance = models.BooleanField(default=False)
-    maintenance_notes = models.TextField(blank=True)
+    maintenance_notes = models.TextField(blank=True,null=True)
     last_cleaned = models.DateTimeField(null=True, blank=True)
     last_inspected = models.DateTimeField(null=True, blank=True)
     
@@ -422,11 +426,12 @@ class Room(TimestampedModel):
     
     # Recent renovation
     last_renovated = models.DateField(null=True, blank=True)
-    renovation_notes = models.TextField(blank=True)
+    renovation_notes = models.TextField(blank=True, null=True)
     
     # Special features unique to this room
     special_features = models.TextField(
         blank=True,
+        null=True,
         help_text='Any special features unique to this room'
     )
     
@@ -459,6 +464,7 @@ class Room(TimestampedModel):
     # Notes
     staff_notes = models.TextField(
         blank=True,
+        null=True,
         help_text='Internal staff notes about this room'
     )
     
@@ -603,12 +609,13 @@ class RoomImage(TimestampedModel):
     
     # Image details
     image = models.ImageField(upload_to='room_images/', null=True, blank=True, help_text='Upload room image')
-    image_alt_text = models.CharField(max_length=255, blank=True, help_text='Alt text for accessibility')
-    caption = models.CharField(max_length=255, blank=True)
-    
+    image_alt_text = models.CharField(max_length=255, blank=True, help_text='Alt text for accessibility', null=True)
+    caption = models.CharField(max_length=255, blank=True, null=True)
+
     # Image type and ordering
     image_type = models.CharField(
         max_length=30,
+        null=True,
         choices=[
             ('room_overview', 'Room Overview'),
             ('bed_area', 'Bed Area'),
@@ -631,6 +638,7 @@ class RoomImage(TimestampedModel):
     
     display_order = models.PositiveIntegerField(
         default=1,
+        null=True,
         help_text='Order to display images (1 = first)'
     )
     
@@ -671,9 +679,10 @@ class RoomAmenity(TimestampedModel):
     """Additional amenities that can be added to rooms"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
+    description = models.TextField(blank=True, null=True)
     category = models.CharField(
         max_length=50,
+        null=True,
         choices=[
             ('technology', 'Technology'),
             ('comfort', 'Comfort'),
@@ -686,11 +695,7 @@ class RoomAmenity(TimestampedModel):
         ],
         default='comfort'
     )
-    icon_class = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text='CSS class for icon display'
-    )
+    
     is_premium = models.BooleanField(
         default=False,
         help_text='Premium amenity that may affect pricing'
@@ -731,9 +736,10 @@ class Extra(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hotel = models.ForeignKey(Hotel, on_delete=models.CASCADE, related_name='extras')
     name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
+    description = models.TextField(blank=True, null=True)
     price = models.DecimalField(
         max_digits=8, 
+        null=True,
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.00'))]
     )
@@ -803,9 +809,9 @@ class SeasonalPricing(TimestampedModel):
     hotel = models.ForeignKey(Hotel, on_delete=models.CASCADE, related_name='seasonal_pricing')
     room_type = models.ForeignKey(RoomType, on_delete=models.CASCADE, related_name='seasonal_pricing')
     
-    name = models.CharField(max_length=100, help_text='e.g., Summer Season, Holiday Season')
-    start_date = models.DateField()
-    end_date = models.DateField()
+    name = models.CharField(max_length=100, help_text='e.g., Summer Season, Holiday Season', null=True)
+    start_date = models.DateField(default=timezone.now, null=True, help_text='Start date of the seasonal pricing')
+    end_date = models.DateField(null=True, help_text='End date of the seasonal pricing')
     
     # Pricing modifiers
     price_multiplier = models.DecimalField(
