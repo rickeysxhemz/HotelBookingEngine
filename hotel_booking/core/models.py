@@ -456,13 +456,6 @@ class Room(TimestampedModel):
         default='low'
     )
     
-    # Room images and media
-    room_images = models.JSONField(
-        default=list,
-        blank=True,
-        help_text='List of image URLs for this specific room'
-    )
-    
     # Notes
     staff_notes = models.TextField(
         blank=True,
