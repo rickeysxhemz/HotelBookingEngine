@@ -429,7 +429,7 @@ class RoomImageAdmin(admin.ModelAdmin):
 @admin.register(RoomAmenity)
 class RoomAmenityAdmin(admin.ModelAdmin):
     """Admin interface for room amenities"""
-    list_display = ['name', 'category', 'is_premium', 'icon_class']
+    list_display = ['name', 'category', 'is_premium']
     list_filter = ['category', 'is_premium']
     search_fields = ['name', 'description']
     readonly_fields = ['id', 'created_at', 'updated_at']
@@ -439,7 +439,7 @@ class RoomAmenityAdmin(admin.ModelAdmin):
             'fields': ('id', 'name', 'description', 'category')
         }),
         ('Display', {
-            'fields': ('icon_class', 'is_premium')
+            'fields': ('is_premium',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),

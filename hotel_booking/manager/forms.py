@@ -229,7 +229,6 @@ class RoomAmenityForm(BaseForm):
     placeholder_mapping = {
         'name': 'e.g., High-speed WiFi, Mini Bar',
         'description': 'Describe the amenity',
-        'icon_class': 'e.g., fas fa-wifi, fas fa-tv',
     }
     
     class Meta:

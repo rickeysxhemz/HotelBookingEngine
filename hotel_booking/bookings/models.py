@@ -84,7 +84,8 @@ class Booking(TimestampedModel):
     check_in = models.DateField()
     check_out = models.DateField()
     guests = models.PositiveIntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(10)]
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+        null=True
     )
     
     # Status tracking
@@ -124,14 +125,14 @@ class Booking(TimestampedModel):
     )
     
     # Guest information
-    primary_guest_name = models.CharField(max_length=100, blank=True)
-    primary_guest_email = models.EmailField(blank=True)
-    primary_guest_phone = models.CharField(max_length=20, blank=True)
-    
+    primary_guest_name = models.CharField(max_length=100, blank=True,null=True)
+    primary_guest_email = models.EmailField(blank=True,null=True)
+    primary_guest_phone = models.CharField(max_length=20, blank=True,null=True)
+
     # Special requests and notes
-    special_requests = models.TextField(blank=True, help_text='Guest special requests')
-    internal_notes = models.TextField(blank=True, help_text='Internal hotel notes')
-    
+    special_requests = models.TextField(blank=True, help_text='Guest special requests',null=True)
+    internal_notes = models.TextField(blank=True, help_text='Internal hotel notes',null=True)
+
     # Timestamps for booking lifecycle
     booking_date = models.DateTimeField(auto_now_add=True)
     confirmation_date = models.DateTimeField(null=True, blank=True)
@@ -143,25 +144,25 @@ class Booking(TimestampedModel):
     cancellation_reason = models.CharField(
         max_length=20,
         choices=CANCELLATION_REASON_CHOICES,
-        blank=True
+        blank=True,
+        null=True
     )
-    cancellation_notes = models.TextField(blank=True)
-    
+    cancellation_notes = models.TextField(blank=True,null=True)
+
     # Source tracking
     booking_source = models.CharField(
         max_length=50,
         choices=[
             ('direct', 'Direct Booking'),
-            ('api', 'API Booking'),
             ('phone', 'Phone Booking'),
             ('walk_in', 'Walk-in'),
             ('agent', 'Travel Agent'),
         ],
-        default='api'
+        default='walk_in'
     )
     
     # Relationships
-    extras = models.ManyToManyField(Extra, through='BookingExtra', blank=True)
+    extras = models.ManyToManyField(Extra, through='BookingExtra', blank=True,null=True)
     
     objects = BookingManager()
     
@@ -408,8 +409,8 @@ class BookingHistory(TimestampedModel):
         on_delete=models.CASCADE, 
         related_name='history'
     )
-    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
-    description = models.TextField()
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES,default='created')
+    description = models.TextField(null=True, blank=True)
     performed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -440,8 +441,8 @@ class BookingGuest(TimestampedModel):
         on_delete=models.CASCADE, 
         related_name='additional_guests'
     )
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
+    first_name = models.CharField(max_length=50,null=True, blank=True)
+    last_name = models.CharField(max_length=50,null=True, blank=True)
     age_group = models.CharField(
         max_length=10,
         choices=[

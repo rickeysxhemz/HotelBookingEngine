@@ -54,7 +54,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, verbose_name='Email Address')
-    username = models.CharField(max_length=150, unique=True)
+    username = models.CharField(max_length=150, unique=True,null=True)
     first_name = models.CharField(max_length=30, blank=True, verbose_name='First Name')
     last_name = models.CharField(max_length=30, blank=True, verbose_name='Last Name')
     phone_number = models.CharField(
@@ -64,16 +64,16 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name='Phone Number'
     )
     date_of_birth = models.DateField(null=True, blank=True, verbose_name='Date of Birth')
-    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True,null=True)
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES, default='guest')
     
     # Address information
-    address_line_1 = models.CharField(max_length=255, blank=True, verbose_name='Address Line 1')
-    address_line_2 = models.CharField(max_length=255, blank=True, verbose_name='Address Line 2')
-    city = models.CharField(max_length=100, blank=True)
-    state = models.CharField(max_length=100, blank=True)
-    postal_code = models.CharField(max_length=20, blank=True)
-    country = models.CharField(max_length=100, blank=True, default='United States')
+    address_line_1 = models.CharField(max_length=255, blank=True, null=True, verbose_name='Address Line 1')
+    address_line_2 = models.CharField(max_length=255, blank=True, null=True, verbose_name='Address Line 2')
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=100, blank=True, null=True)
+    postal_code = models.CharField(max_length=20, blank=True, null=True)
+    country = models.CharField(max_length=100, blank=True, null=True, default='Saudi Arabia')
     
     # Preferences
     newsletter_subscription = models.BooleanField(default=False, verbose_name='Subscribe to Newsletter')
@@ -86,7 +86,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name='Profile Picture',
         validators=[validate_image_file]
     )
-    bio = models.TextField(max_length=500, blank=True, verbose_name='Bio')
+    bio = models.TextField(max_length=500, blank=True, null=True, verbose_name='Bio')
     
     # System fields
     is_active = models.BooleanField(default=True)
@@ -172,16 +172,16 @@ class UserProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='profile')
     
     # Emergency contact
-    emergency_contact_name = models.CharField(max_length=100, blank=True)
-    emergency_contact_phone = models.CharField(max_length=17, blank=True)
-    emergency_contact_relationship = models.CharField(max_length=50, blank=True)
+    emergency_contact_name = models.CharField(max_length=100, blank=True,null=True)
+    emergency_contact_phone = models.CharField(max_length=17, blank=True,null=True)
+    emergency_contact_relationship = models.CharField(max_length=50, blank=True,null=True)
     
     # Travel preferences
-    preferred_room_type = models.CharField(max_length=50, blank=True)
-    dietary_restrictions = models.TextField(blank=True)
-    accessibility_needs = models.TextField(blank=True)
-    special_requests = models.TextField(blank=True)
-    
+    preferred_room_type = models.CharField(max_length=50, blank=True,null=True)
+    dietary_restrictions = models.TextField(blank=True,null=True)
+    accessibility_needs = models.TextField(blank=True,null=True)
+    special_requests = models.TextField(blank=True,null=True)
+
     # Basic statistics
     total_bookings = models.PositiveIntegerField(default=0)
     total_spent = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
