@@ -193,14 +193,6 @@ class OfferDetailSerializer(serializers.ModelSerializer):
     )
     highlights = OfferHighlightSerializer(many=True, read_only=True)
     images = OfferImageSerializer(many=True, read_only=True)
-    applicable_room_types = serializers.StringRelatedField(many=True, read_only=True)
-    applicable_room_type_ids = serializers.PrimaryKeyRelatedField(
-        many=True, 
-        queryset=RoomType.objects.all(),
-        source='applicable_room_types',
-        write_only=True,
-        required=False
-    )
     discount_display = serializers.ReadOnlyField()
     is_valid = serializers.ReadOnlyField()
     is_available = serializers.ReadOnlyField()
@@ -210,17 +202,16 @@ class OfferDetailSerializer(serializers.ModelSerializer):
         model = Offer
         fields = [
             'id', 'name', 'description', 'short_description',
-            'category', 'category_id', 'offer_type', 'discount_type', 
-            'discount_percentage', 'discount_amount', 'package_price', 
-            'valid_from', 'valid_to', 'minimum_stay', 'maximum_stay', 
-            'minimum_advance_booking', 'maximum_advance_booking', 
-            'hotel_name', 'hotel_id', 'applicable_room_types', 
-            'applicable_room_type_ids', 'total_bookings_limit', 
-            'bookings_used', 'applies_monday', 'applies_tuesday', 
-            'applies_wednesday', 'applies_thursday', 'applies_friday', 
-            'applies_saturday', 'applies_sunday', 'is_active', 
-            'is_featured', 'is_combinable', 'slug', 'terms_and_conditions', 
-            'highlights', 'images', 'discount_display', 'is_valid', 
+            'category', 'category_id', 'offer_type', 'discount_type',
+            'discount_percentage', 'discount_amount', 'package_price',
+            'valid_from', 'valid_to', 'minimum_stay', 'maximum_stay',
+            'minimum_advance_booking', 'maximum_advance_booking',
+            'hotel_name', 'hotel_id', 'total_bookings_limit',
+            'bookings_used', 'applies_monday', 'applies_tuesday',
+            'applies_wednesday', 'applies_thursday', 'applies_friday',
+            'applies_saturday', 'applies_sunday', 'is_active',
+            'is_featured', 'is_combinable', 'slug', 'terms_and_conditions',
+            'highlights', 'images', 'discount_display', 'is_valid',
             'is_available', 'days_remaining', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'bookings_used', 'created_at', 'updated_at']
@@ -241,26 +232,18 @@ class OfferDetailSerializer(serializers.ModelSerializer):
 
 class OfferCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer for creating and updating offers"""
-    
-    applicable_room_type_ids = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=RoomType.objects.all(),
-        source='applicable_room_types',
-        required=False,
-        help_text="List of room type IDs this offer applies to"
-    )
-    
+
     class Meta:
         model = Offer
         fields = [
             'name', 'description', 'short_description', 'category',
-            'offer_type', 'discount_type', 'discount_percentage', 
-            'discount_amount', 'package_price', 'valid_from', 'valid_to', 
-            'minimum_stay', 'maximum_stay', 'minimum_advance_booking', 
-            'maximum_advance_booking', 'hotel', 'applicable_room_type_ids', 
-            'total_bookings_limit', 'applies_monday', 'applies_tuesday', 
-            'applies_wednesday', 'applies_thursday', 'applies_friday', 
-            'applies_saturday', 'applies_sunday', 'is_active', 'is_featured', 
+            'offer_type', 'discount_type', 'discount_percentage',
+            'discount_amount', 'package_price', 'valid_from', 'valid_to',
+            'minimum_stay', 'maximum_stay', 'minimum_advance_booking',
+            'maximum_advance_booking', 'hotel',
+            'total_bookings_limit', 'applies_monday', 'applies_tuesday',
+            'applies_wednesday', 'applies_thursday', 'applies_friday',
+            'applies_saturday', 'applies_sunday', 'is_active', 'is_featured',
             'is_combinable', 'terms_and_conditions'
         ]
     
@@ -291,10 +274,6 @@ class OfferSearchSerializer(serializers.Serializer):
     check_out = serializers.DateField(
         required=False,
         help_text="Check-out date to filter applicable offers"
-    )
-    room_type_id = serializers.UUIDField(
-        required=False,
-        help_text="Filter offers applicable to specific room type"
     )
     offer_type = serializers.ChoiceField(
         choices=Offer.OFFER_TYPE_CHOICES,

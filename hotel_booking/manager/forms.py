@@ -300,8 +300,7 @@ class OfferForm(BaseForm):
         # Limit category choices to active categories
         self.fields['category'].queryset = OfferCategory.objects.filter(is_active=True)
 
-        # Limit room type choices to active room types
-        self.fields['applicable_room_types'].queryset = RoomType.objects.filter(is_active=True)
+
 
     class Meta:
         model = Offer
@@ -309,7 +308,7 @@ class OfferForm(BaseForm):
             'hotel', 'category', 'name', 'description', 'short_description', 'offer_type',
             'discount_type', 'discount_percentage', 'discount_amount', 'package_price',
             'valid_from', 'valid_to', 'minimum_stay', 'maximum_stay',
-            'minimum_advance_booking', 'maximum_advance_booking', 'applicable_room_types',
+            'minimum_advance_booking', 'maximum_advance_booking',
             'total_bookings_limit', 'is_featured', 'is_active', 'is_combinable',
             'terms_and_conditions'
         ]
@@ -317,7 +316,6 @@ class OfferForm(BaseForm):
             'description': forms.Textarea(attrs={'rows': 4}),
             'short_description': forms.Textarea(attrs={'rows': 2}),
             'terms_and_conditions': forms.Textarea(attrs={'rows': 6}),
-            'applicable_room_types': forms.CheckboxSelectMultiple(),
         }
 
 

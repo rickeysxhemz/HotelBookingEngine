@@ -240,11 +240,12 @@ class Offer(TimestampedModel):
         on_delete=models.CASCADE,
         related_name='offers'
     )
-    applicable_room_types = models.ManyToManyField(
-        RoomType,
-        blank=True,
-        help_text="Room types this offer applies to. Leave empty for all room types."
-    )
+    # Removed applicable_room_types field as per request
+    # applicable_room_types = models.ManyToManyField(
+    #     RoomType,
+    #     blank=True,
+    #     help_text="Room types this offer applies to. Leave empty for all room types."
+    # )
     
     # Availability
     total_bookings_limit = models.PositiveIntegerField(

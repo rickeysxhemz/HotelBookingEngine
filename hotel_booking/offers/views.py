@@ -104,13 +104,13 @@ class OfferListCreateView(generics.ListCreateAPIView):
             except ValueError:
                 pass  # Invalid date format, ignore filter
         
-        # Filter by room type
-        room_type_id = self.request.query_params.get('room_type_id')
-        if room_type_id:
-            queryset = queryset.filter(
-                Q(applicable_room_types__isnull=True) |
-                Q(applicable_room_types__id=room_type_id)
-            ).distinct()
+        # Removed room type filtering as applicable_room_types field is removed
+        # room_type_id = self.request.query_params.get('room_type_id')
+        # if room_type_id:
+        #     queryset = queryset.filter(
+        #         Q(applicable_room_types__isnull=True) |
+        #         Q(applicable_room_types__id=room_type_id)
+        #     ).distinct()
         
         return queryset.order_by('-is_featured', '-created_at')
     
@@ -211,7 +211,6 @@ class OfferDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Offer.objects.select_related(
             'hotel', 'category'
         ).prefetch_related(
-            'applicable_room_types',
             'highlights',
             'images'
         )
@@ -302,7 +301,7 @@ class OfferSearchView(APIView):
         
         data = serializer.validated_data
         queryset = Offer.objects.active_offers().select_related('hotel', 'category').prefetch_related(
-            'images', 'highlights', 'applicable_room_types'
+            'images', 'highlights'
         )
         
         # Apply filters
@@ -322,11 +321,12 @@ class OfferSearchView(APIView):
         if data.get('is_featured'):
             queryset = queryset.filter(is_featured=True)
         
-        if data.get('room_type_id'):
-            queryset = queryset.filter(
-                Q(applicable_room_types__isnull=True) |
-                Q(applicable_room_types__id=data['room_type_id'])
-            ).distinct()
+        # Removed room type filtering as applicable_room_types field is removed
+        # if data.get('room_type_id'):
+        #     queryset = queryset.filter(
+        #         Q(applicable_room_types__isnull=True) |
+        #         Q(applicable_room_types__id=data['room_type_id'])
+        #     ).distinct()
         
         if data.get('min_discount'):
             queryset = queryset.filter(

@@ -65,6 +65,10 @@
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                   </div>
 
+                {# Checkbox Select Multiple Fields #}
+                {% elif field|is_checkbox_select_multiple %}
+                  {# Removed UI for CheckboxSelectMultiple fields as per request #}
+
                 {# Date Fields #}
                 {% elif field_type == 'date' %}
                   <div class="form-floating">

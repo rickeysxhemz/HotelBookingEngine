@@ -146,6 +146,8 @@ class DashboardView(ManagerRequiredMixin, View):
         active_offers_count = Offer.objects.filter(is_active=True).count()
         featured_offers_count = Offer.objects.filter(is_featured=True).count()
         offer_categories_count = OfferCategory.objects.count()
+        offer_highlights_count = OfferHighlight.objects.count()
+        offer_images_count = OfferImage.objects.count()
 
         # Bookings related
         bookingextras_count = BookingExtra.objects.count()
@@ -226,6 +228,18 @@ class DashboardView(ManagerRequiredMixin, View):
                 'change': user.has_perm('offers.change_offercategory'),
                 'delete': user.has_perm('offers.delete_offercategory'),
             },
+            'offerhighlight': {
+                'add': user.has_perm('offers.add_offerhighlight'),
+                'view': user.has_perm('offers.view_offerhighlight'),
+                'change': user.has_perm('offers.change_offerhighlight'),
+                'delete': user.has_perm('offers.delete_offerhighlight'),
+            },
+            'offerimage': {
+                'add': user.has_perm('offers.add_offerimage'),
+                'view': user.has_perm('offers.view_offerimage'),
+                'change': user.has_perm('offers.change_offerimage'),
+                'delete': user.has_perm('offers.delete_offerimage'),
+            },
         }
 
         context = {
@@ -246,6 +260,8 @@ class DashboardView(ManagerRequiredMixin, View):
             'active_offers_count': active_offers_count,
             'featured_offers_count': featured_offers_count,
             'offer_categories_count': offer_categories_count,
+            'offer_highlights_count': offer_highlights_count,
+            'offer_images_count': offer_images_count,
             'bookingextras_count': bookingextras_count,
             'bookingguests_count': bookingguests_count,
             'bookinghistories_count': bookinghistories_count,
@@ -991,6 +1007,12 @@ class OfferCategoryListView(BulkActionMixin, BaseListView):
     context_object_name = 'objects'
     permission_required = 'offers.view_offercategory'
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        # Override add_url_name to match urls.py name
+        ctx['add_url_name'] = 'manager:offer_category_add'
+        return ctx
+
 
 class OfferCategoryCreateView(BaseCreateView):
     """Create a new offer category"""
@@ -1025,18 +1047,21 @@ class OfferHighlightListView(BulkActionMixin, BaseListView):
     template_name = 'manager/list.html'
     context_object_name = 'objects'
     permission_required = 'offers.view_offerhighlight'
-    
+
     def get_queryset(self):
         offer_id = self.kwargs.get('offer_id')
         if offer_id:
             return OfferHighlight.objects.filter(offer_id=offer_id).order_by('order')
         return OfferHighlight.objects.all().order_by('offer__title', 'order')
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         offer_id = self.kwargs.get('offer_id')
         if offer_id:
             context['offer'] = Offer.objects.get(id=offer_id)
+        else:
+            # Remove add_url_name for global list view since add requires offer_id
+            context['add_url_name'] = None
         return context
 
 
@@ -1090,18 +1115,21 @@ class OfferImageListView(BulkActionMixin, BaseListView):
     template_name = 'manager/list.html'
     context_object_name = 'objects'
     permission_required = 'offers.view_offerimage'
-    
+
     def get_queryset(self):
         offer_id = self.kwargs.get('offer_id')
         if offer_id:
             return OfferImage.objects.filter(offer_id=offer_id).order_by('order')
         return OfferImage.objects.all().order_by('offer__title', 'order')
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         offer_id = self.kwargs.get('offer_id')
         if offer_id:
             context['offer'] = Offer.objects.get(id=offer_id)
+        else:
+            # Remove add_url_name for global list view since add requires offer_id
+            context['add_url_name'] = None
         return context
 
 

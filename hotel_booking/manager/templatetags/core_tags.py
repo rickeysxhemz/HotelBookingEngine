@@ -86,3 +86,11 @@ def add_class(field, css_class):
 def is_boolean_field(field):
     """Returns True if the field is a BooleanField."""
     return field.field.__class__.__name__ == 'BooleanField'
+
+@register.filter
+def is_checkbox_select_multiple(field):
+    """Returns True if the field is a CheckboxSelectMultiple widget."""
+    from django.forms.widgets import CheckboxSelectMultiple
+    return isinstance(field.field.widget, CheckboxSelectMultiple)
+
+

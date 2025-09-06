@@ -72,9 +72,7 @@ class OfferAdmin(admin.ModelAdmin):
                 'minimum_advance_booking', 'maximum_advance_booking'
             )
         }),
-        ('Applicability', {
-            'fields': ('applicable_room_types',)
-        }),
+
         ('Availability Limits', {
             'fields': ('total_bookings_limit', 'bookings_used')
         }),
@@ -94,7 +92,7 @@ class OfferAdmin(admin.ModelAdmin):
         }),
     )
     
-    filter_horizontal = ('applicable_room_types',)
+
     readonly_fields = ('bookings_used',)
     
     inlines = [OfferHighlightInline, OfferImageInline]

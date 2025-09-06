@@ -177,6 +177,24 @@
                 {% if perms.offercategory.add %}<a href="{% url 'manager:offer_category_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
               </td>
             </tr>
+            <tr>
+              <td>Offer Highlights</td>
+              <td>{{ offer_highlights_count }}</td>
+              <td>
+                {% if perms.offerhighlight.view %}<a href="{% url 'manager:offer_highlights_all' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {# Removed Add link for offer highlights as it requires offer_id argument #}
+                {# {% if perms.offerhighlight.add %}<a href="{% url 'manager:offer_highlight_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %} #}
+              </td>
+            </tr>
+            <tr>
+              <td>Offer Images</td>
+              <td>{{ offer_images_count }}</td>
+              <td>
+                {% if perms.offerimage.view %}<a href="{% url 'manager:offer_images_all' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {# Removed Add link for offer images as it requires offer_id argument #}
+                {# {% if perms.offerimage.add %}<a href="{% url 'manager:offer_image_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %} #}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
