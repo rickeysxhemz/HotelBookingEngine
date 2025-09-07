@@ -9,11 +9,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 # Local imports
-from .models import Hotel, Room, RoomType, Extra
-from .services import HotelSearchService, RoomAvailabilityService
+from .models import Hotel, Room, RoomType, Extra, ContactMessage
+from .services import HotelSearchService, RoomAvailabilityService, ContactEmailService
 from bookings.serializers import (
     RoomSerializer, RoomTypeSerializer, ExtraSerializer, RoomAvailabilitySerializer
 )
+from .serializers import ContactMessageSerializer
 
 
 class HotelSerializer(serializers.ModelSerializer):
@@ -1481,6 +1482,19 @@ def hotel_search(request):
             'error': 'Internal server error',
             'detail': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Contact Form API Views
+class ContactMessageView(generics.CreateAPIView):
+    """API view to handle contact form submissions"""
+    queryset = ContactMessage.objects.all()
+    serializer_class = ContactMessageSerializer
+    permission_classes = [AllowAny]
+
+    def perform_create(self, serializer):
+        contact_message = serializer.save()
+        # Send email notification asynchronously or synchronously
+        ContactEmailService.send_contact_email(contact_message)
 
 
 @api_view(['GET'])

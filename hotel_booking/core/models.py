@@ -874,3 +874,20 @@ RoomType.add_to_class(
         help_text='Additional amenities for this room type'
     )
 )
+
+
+class ContactMessage(TimestampedModel):
+    """Model to store contact form messages"""
+    full_name = models.CharField(max_length=255, null=True, blank=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    subject = models.CharField(max_length=255, null=True, blank=True)
+    message = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Contact Message'
+        verbose_name_plural = 'Contact Messages'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Message from {self.full_name} - {self.subject}"

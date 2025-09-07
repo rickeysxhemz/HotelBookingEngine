@@ -43,4 +43,7 @@ urlpatterns = [
     
     # === LOCATION ===
     path('<uuid:hotel_id>/location/', views.HotelLocationAPIView.as_view(), name='hotel_location'),
+
+    # === CONTACT FORM ===
+    path('contact/', views.ContactMessageView.as_view(), name='contact_message'),
 ]

@@ -2,12 +2,13 @@
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from decimal import Decimal
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Optional, Tuple
 
 # Local imports
-from .models import Hotel, Room, RoomType, Extra, SeasonalPricing
+from .models import Hotel, Room, RoomType, Extra, SeasonalPricing, ContactMessage
 
 
 class RoomAvailabilityService:
@@ -439,3 +440,81 @@ class ReportingService:
             'booking_count': booking_count,
             'average_booking_value': avg_booking_value
         }
+
+
+class ContactEmailService:
+    """Service class for handling contact form email notifications"""
+
+    @staticmethod
+    def send_contact_email(contact_message: ContactMessage) -> bool:
+        """
+        Send email notification for contact form submission.
+        Returns True if email was sent successfully, False otherwise.
+        """
+        try:
+            import os
+            # Email subject
+            subject = f"New Contact Form Submission: {contact_message.subject}"
+
+            # Email message body
+            message = f"""
+Dear Hotel Maar Contact Team,
+
+A new contact form submission has been received:
+
+Full Name: {contact_message.full_name}
+Email: {contact_message.email}
+Phone: {contact_message.phone or 'Not provided'}
+
+Subject: {contact_message.subject}
+
+Message:
+{contact_message.message}
+
+Submitted on: {contact_message.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+"""
+
+            # Get recipient email addresses
+            # Send to both primary and secondary email addresses
+            from django.conf import settings
+            recipient_list = [
+                'mujadid20001@gmail.com',  # Secondary email
+                settings.DEFAULT_FROM_EMAIL  # Primary email (fallback)
+            ]
+
+            # Send the email using contact form specific email configuration
+            from django.core.mail.backends.smtp import EmailBackend
+
+            # Load SMTP credentials from environment variables
+            smtp_username = os.environ.get('CONTACT_EMAIL_USERNAME')
+            smtp_password = os.environ.get('CONTACT_EMAIL_PASSWORD')
+
+            backend = EmailBackend(
+                host='smtp.gmail.com',
+                port=587,
+                username=smtp_username,
+                password=smtp_password,
+                use_tls=True,
+                fail_silently=False
+            )
+
+            # Create email message
+            from django.core.mail import EmailMessage
+            email = EmailMessage(
+                subject=subject,
+                body=message,
+                from_email='Hotel Booking Contact <mujadid20001@gmail.com>',
+                to=recipient_list,
+                reply_to=[contact_message.email], 
+                connection=backend
+            )
+
+            # Send the email
+            email.send()
+
+            return True
+
+        except Exception as e:
+            # Log the error (in a real implementation)
+            print(f"Failed to send contact email: {str(e)}")
+            return False
