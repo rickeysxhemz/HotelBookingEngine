@@ -274,10 +274,7 @@ class RoomAdmin(admin.ModelAdmin):
             'fields': ('last_renovated', 'renovation_notes'),
             'classes': ('collapse',)
         }),
-        ('Images & Media', {
-            'fields': ('room_images',),
-            'classes': ('collapse',)
-        }),
+
         ('Staff Notes', {
             'fields': ('staff_notes',),
             'classes': ('collapse',)

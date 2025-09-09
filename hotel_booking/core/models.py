@@ -62,7 +62,8 @@ class Hotel(TimestampedModel):
         address_parts = [self.address_line_1]
         if self.address_line_2:
             address_parts.append(self.address_line_2)
-        address_parts.extend([self.city, self.state, self.postal_code, self.country])
+        # Filter out None or empty strings
+        address_parts.extend([part for part in [self.city, self.state, self.postal_code, self.country] if part])
         return ', '.join(address_parts)
     
     def get_available_rooms(self, check_in, check_out, guests=1):
@@ -843,7 +844,7 @@ class SeasonalPricing(TimestampedModel):
     
     def clean(self):
         """Validate date range"""
-        if self.start_date >= self.end_date:
+        if self.start_date and self.end_date and self.start_date >= self.end_date:
             raise ValidationError('End date must be after start date')
     
     def applies_to_date(self, check_date):

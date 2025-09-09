@@ -483,6 +483,7 @@ class OfferImage(TimestampedModel):
     )
     image = models.ImageField(
         upload_to=offer_image_upload_path,
+        max_length=500,
         help_text="Offer promotional image"
     )
     alt_text = models.CharField(

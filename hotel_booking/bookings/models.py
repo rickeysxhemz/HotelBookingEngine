@@ -198,17 +198,18 @@ class Booking(TimestampedModel):
     def clean(self):
         """Validate booking data"""
         # Validate dates
-        if self.check_in >= self.check_out:
-            raise ValidationError('Check-out date must be after check-in date')
-        
+        if self.check_in and self.check_out:
+            if self.check_in >= self.check_out:
+                raise ValidationError('Check-out date must be after check-in date')
+
         # Validate guest count
-        if self.room and self.guests > self.room.capacity:
+        if self.room and self.guests and self.guests > self.room.capacity:
             raise ValidationError(
                 f'Number of guests ({self.guests}) exceeds room capacity ({self.room.capacity})'
             )
-        
+
         # Validate past dates
-        if self.check_in < timezone.now().date():
+        if self.check_in and self.check_in < timezone.now().date():
             raise ValidationError('Check-in date cannot be in the past')
     
     def _generate_booking_reference(self):
@@ -232,6 +233,8 @@ class Booking(TimestampedModel):
     @property
     def nights(self):
         """Number of nights for the booking"""
+        if self.check_in is None or self.check_out is None:
+            return 0
         return (self.check_out - self.check_in).days
     
     @property
