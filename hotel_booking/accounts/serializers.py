@@ -135,7 +135,7 @@ class PasswordChangeSerializer(serializers.Serializer):
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating user profile"""
-    profile = UserProfileSerializer()
+    profile = UserProfileSerializer(required=False)
     
     class Meta:
         model = CustomUser
