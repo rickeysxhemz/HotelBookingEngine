@@ -1,6 +1,7 @@
 # Django imports
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Prefetch, Avg
+from decimal import Decimal
 
 # Django REST Framework imports
 from rest_framework import generics, status, permissions, serializers
@@ -643,22 +644,37 @@ class HotelPricingAPIView(generics.GenericAPIView):
         try:
             hotel = Hotel.objects.get(id=hotel_id, is_active=True)
             
-            # Get room types with pricing
+            # Get room types with pricing from actual rooms
+            room_types_with_pricing = []
             room_types = RoomType.objects.filter(rooms__hotel=hotel).distinct()
-            pricing_data = []
             
             for room_type in room_types:
-                pricing_data.append({
-                    'room_type_id': str(room_type.id),
-                    'name': room_type.name,
-                    'base_price': float(room_type.base_price),
-                    'weekend_price': float(room_type.base_price * 1.2),  # 20% markup
-                    'holiday_price': float(room_type.base_price * 1.5),  # 50% markup
-                })
+                # Get rooms of this type for this hotel
+                rooms_of_type = Room.objects.filter(
+                    hotel=hotel, 
+                    room_type=room_type, 
+                    is_active=True
+                )
+                
+                if rooms_of_type.exists():
+                    # Get average base price for this room type
+                    avg_price = rooms_of_type.aggregate(
+                        avg_price=Avg('base_price')
+                    )['avg_price'] or Decimal('0.00')
+                    
+                    room_types_with_pricing.append({
+                        'room_type_id': str(room_type.id),
+                        'name': room_type.name,
+                        'base_price': float(avg_price),
+                        'weekend_price': float(avg_price * Decimal('1.2')),  # 20% markup
+                        'holiday_price': float(avg_price * Decimal('1.5')),  # 50% markup
+                        'max_capacity': room_type.max_capacity,
+                        'bed_type': room_type.bed_type,
+                    })
             
             return Response({
                 'hotel_id': str(hotel.id),
-                'pricing': pricing_data,
+                'pricing': room_types_with_pricing,
                 'currency': 'USD',
                 'taxes_included': False
             })
