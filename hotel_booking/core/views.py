@@ -725,11 +725,48 @@ class RoomAvailabilityAPIView(generics.GenericAPIView):
 
 
 class HotelAmenitiesAPIView(generics.GenericAPIView):
-    """Get hotel amenities (alias for existing view)"""
+    """Get hotel amenities and room features"""
     permission_classes = [permissions.AllowAny]
     
     def get(self, request, hotel_id):
-        return get_hotel_amenities(request, hotel_id)
+        try:
+            hotel = get_object_or_404(Hotel, id=hotel_id, is_active=True)
+            
+            # Get all extras grouped by category
+            extras_by_category = {}
+            for extra in hotel.extras.filter(is_active=True):
+                category = extra.get_category_display()
+                if category not in extras_by_category:
+                    extras_by_category[category] = []
+                
+                extras_by_category[category].append({
+                    'id': str(extra.id),
+                    'name': extra.name,
+                    'description': extra.description,
+                    'price': extra.price,
+                    'pricing_type': extra.get_pricing_type_display(),
+                    'max_quantity': extra.max_quantity
+                })
+            
+            # Get room type amenities
+            room_amenities = set()
+            for room_type in RoomType.objects.filter(rooms__hotel=hotel).distinct():
+                room_amenities.update(room_type.amenities_list)
+            
+            return Response({
+                'hotel': {
+                    'id': str(hotel.id),
+                    'name': hotel.name
+                },
+                'room_amenities': list(room_amenities),
+                'hotel_services': extras_by_category
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to get hotel amenities: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class HotelServicesAPIView(generics.GenericAPIView):
