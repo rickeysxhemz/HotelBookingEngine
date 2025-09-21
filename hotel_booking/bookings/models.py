@@ -199,8 +199,8 @@ class Booking(models.Model):
                 errors['check_in_date'] = 'Check-in date cannot be in the past'
         
         # Check room capacity
-        if self.room and (self.adults + self.children) > self.room.max_occupancy:
-            errors['adults'] = f'Total guests exceed room capacity ({self.room.max_occupancy})'
+        if self.room and (self.adults + self.children) > self.room.capacity:
+            errors['adults'] = f'Total guests exceed room capacity ({self.room.capacity})'
         
         if errors:
             raise ValidationError(errors)

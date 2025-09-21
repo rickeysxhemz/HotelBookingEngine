@@ -64,3 +64,4 @@ create_superuser_if_missing
 
 # 4) Exec the CMD (start server)
 exec "$@"
+

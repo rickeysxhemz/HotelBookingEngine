@@ -395,7 +395,7 @@ class BookingListAPIView(generics.ListAPIView):
         queryset = Booking.objects.select_related(
             'user', 'room', 'room__hotel', 'room__room_type'
         ).prefetch_related(
-            'room__amenities'
+            'room__room_type__additional_amenities'
         )
         
         # Additional filtering based on query parameters
@@ -500,7 +500,7 @@ class BookingDetailAPIView(generics.RetrieveAPIView):
         return Booking.objects.select_related(
             'user', 'room', 'room__hotel', 'room__room_type'
         ).prefetch_related(
-            'room__amenities', 'room__images'
+            'room__room_type__additional_amenities', 'room__images'
         )
 
 
@@ -750,12 +750,14 @@ class RoomBookingListAPIView(generics.ListAPIView):
             # Add room information
             response.data['room_info'] = {
                 'id': room.id,
-                'name': room.name,
                 'room_number': room.room_number,
                 'room_type': room.room_type.name,
                 'hotel': room.hotel.name,
                 'capacity': room.capacity,
-                'price_per_night': str(room.price_per_night)
+                'base_price': str(room.base_price),
+                'floor': room.floor,
+                'view_type': room.view_type,
+                'is_active': room.is_active
             }
             
             # Add booking statistics

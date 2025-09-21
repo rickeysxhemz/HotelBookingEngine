@@ -26,7 +26,7 @@ urlpatterns = [
     path('<int:pk>/delete/', views.BookingDeleteAPIView.as_view(), name='booking-delete'), # DELETE
     
     # Additional useful endpoints
-    path('user/<int:user_id>/', views.UserBookingListAPIView.as_view(), name='user-bookings'),
-    path('room/<int:room_id>/', views.RoomBookingListAPIView.as_view(), name='room-bookings'),
+    path('user/<uuid:user_id>/', views.UserBookingListAPIView.as_view(), name='user-bookings'),
+    path('room/<uuid:room_id>/', views.RoomBookingListAPIView.as_view(), name='room-bookings'),
 ]
 

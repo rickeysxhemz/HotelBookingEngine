@@ -30,7 +30,7 @@ class BookingSerializer(serializers.ModelSerializer):
     hotel_address = serializers.CharField(source='hotel.address', read_only=True)
     room_number = serializers.CharField(source='room.room_number', read_only=True)
     room_type = serializers.CharField(source='room.room_type.name', read_only=True)
-    room_max_occupancy = serializers.IntegerField(source='room.max_occupancy', read_only=True)
+    room_max_occupancy = serializers.IntegerField(source='room.capacity', read_only=True)
     
     # User details (if associated)
     user_username = serializers.CharField(source='user.username', read_only=True)
@@ -179,8 +179,8 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         children = data.get('children', 0)
         total_guests = adults + children
         
-        if room and total_guests > room.max_occupancy:
-            errors['adults'] = f'Total guests ({total_guests}) exceed room capacity ({room.max_occupancy})'
+        if room and total_guests > room.capacity:
+            errors['adults'] = f'Total guests ({total_guests}) exceed room capacity ({room.capacity})'
         
         # Validate hotel and room relationship
         hotel = data.get('hotel')
@@ -308,8 +308,8 @@ class BookingUpdateSerializer(serializers.ModelSerializer):
         children = data.get('children', instance.children if instance else 0)
         total_guests = adults + children
         
-        if instance and instance.room and total_guests > instance.room.max_occupancy:
-            errors['adults'] = f'Total guests ({total_guests}) exceed room capacity ({instance.room.max_occupancy})'
+        if instance and instance.room and total_guests > instance.room.capacity:
+            errors['adults'] = f'Total guests ({total_guests}) exceed room capacity ({instance.room.capacity})'
         
         # Don't allow updates to completed or cancelled bookings (except status)
         if instance and instance.status in ['completed', 'cancelled']:

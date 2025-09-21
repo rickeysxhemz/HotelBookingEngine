@@ -237,8 +237,8 @@ class BookingForm(BaseForm):
                 raise forms.ValidationError('Check-out date must be after check-in date.')
 
         # Validate room capacity
-        if room and (adults + children) > room.max_occupancy:
-            raise forms.ValidationError(f'Total guests ({adults + children}) exceed room capacity ({room.max_occupancy}).')
+        if room and (adults + children) > room.capacity:
+            raise forms.ValidationError(f'Total guests ({adults + children}) exceed room capacity ({room.capacity}).')
 
         return cleaned_data
 
@@ -390,17 +390,56 @@ class OfferImageForm(BaseForm):
         self.offer_id = kwargs.pop('offer_id', None)
         super().__init__(*args, **kwargs)
         
-        # If no offer_id is provided (global create), show offer selection
-        if not self.offer_id:
+        # If offer_id is provided, add it as a hidden field
+        if self.offer_id:
+            try:
+                offer = Offer.objects.get(id=self.offer_id)
+                self.fields['offer'] = forms.ModelChoiceField(
+                    queryset=Offer.objects.filter(id=self.offer_id),
+                    initial=offer,
+                    widget=forms.HiddenInput(),
+                    required=True
+                )
+                # Set the initial value for the instance
+                if not self.instance.pk:
+                    self.instance.offer = offer
+            except Offer.DoesNotExist:
+                # If offer doesn't exist, show selection dropdown
+                self.fields['offer'] = forms.ModelChoiceField(
+                    queryset=Offer.objects.filter(is_active=True),
+                    empty_label="Select an offer",
+                    widget=forms.Select(attrs={'class': 'form-select'}),
+                    required=True
+                )
+        else:
+            # If no offer_id is provided (global create), show offer selection
             self.fields['offer'] = forms.ModelChoiceField(
                 queryset=Offer.objects.filter(is_active=True),
                 empty_label="Select an offer",
-                widget=forms.Select(attrs={'class': 'form-select'})
+                widget=forms.Select(attrs={'class': 'form-select'}),
+                required=True
             )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        offer = cleaned_data.get('offer')
+        
+        if not offer and self.offer_id:
+            # Try to get the offer from offer_id if not in cleaned_data
+            try:
+                offer = Offer.objects.get(id=self.offer_id)
+                cleaned_data['offer'] = offer
+            except Offer.DoesNotExist:
+                raise forms.ValidationError("Invalid offer selected.")
+        
+        if not offer:
+            raise forms.ValidationError("An offer must be selected.")
+        
+        return cleaned_data
     
     class Meta:
         model = OfferImage
-        fields = ['image', 'alt_text', 'caption', 'order', 'is_primary']
+        fields = ['offer', 'image', 'alt_text', 'caption', 'order', 'is_primary']
         widgets = {
             'image': forms.FileInput(attrs={'accept': 'image/*'}),
         }

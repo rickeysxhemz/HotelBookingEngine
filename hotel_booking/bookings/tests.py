@@ -63,9 +63,9 @@ class BookingModelTestCase(TestCase):
             hotel=self.hotel,
             room_type=self.room_type,
             room_number='501',
-            max_occupancy=4,
-            price_per_night=Decimal('250.00'),
-            is_available=True
+            capacity=4,
+            base_price=Decimal('250.00'),
+            is_active=True
         )
     
     def test_booking_creation_with_all_fields(self):
@@ -305,8 +305,8 @@ class BookingSerializerTestCase(TestCase):
             hotel=self.hotel,
             room_type=self.room_type,
             room_number='101',
-            max_occupancy=2,
-            price_per_night=Decimal('150.00')
+            capacity=2,
+            base_price=Decimal('150.00')
         )
     
     def test_booking_serializer_read(self):
@@ -416,8 +416,8 @@ class BookingAPITestCase(APITestCase):
             hotel=self.hotel,
             room_type=self.room_type,
             room_number='API-101',
-            max_occupancy=4,
-            price_per_night=Decimal('180.00')
+            capacity=4,
+            base_price=Decimal('180.00')
         )
         
         # Set up API client with authentication
@@ -712,8 +712,8 @@ class BookingEmailTestCase(TestCase):
             hotel=self.hotel,
             room_type=self.room_type,
             room_number='EMAIL-101',
-            max_occupancy=2,
-            price_per_night=Decimal('200.00')
+            capacity=2,
+            base_price=Decimal('200.00')
         )
     
     def test_booking_confirmation_email_content(self):
@@ -870,8 +870,8 @@ class BookingIntegrationTestCase(APITestCase):
             hotel=self.hotel,
             room_type=self.room_type,
             room_number='INT-501',
-            max_occupancy=3,
-            price_per_night=Decimal('300.00')
+            capacity=3,
+            base_price=Decimal('300.00')
         )
         
         # Set up authenticated client

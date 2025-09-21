@@ -13,7 +13,7 @@ class IsAdminOrManagerPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         # Read permissions are allowed for any request,
         # so we'll always allow GET, HEAD or OPTIONS requests.
-        if request.method in permissions.READONLY_METHODS:
+        if request.method in permissions.SAFE_METHODS:
             return True
         
         # Check if user is authenticated
@@ -39,7 +39,7 @@ class IsAdminOrManagerPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         # Read permissions are allowed for any request,
         # so we'll always allow GET, HEAD or OPTIONS requests.
-        if request.method in permissions.READONLY_METHODS:
+        if request.method in permissions.SAFE_METHODS:
             return True
         
         # Check if user is authenticated
@@ -72,7 +72,7 @@ class IsAdminOrManagerOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         # Read permissions are allowed for any request,
         # so we'll always allow GET, HEAD or OPTIONS requests.
-        if request.method in permissions.READONLY_METHODS:
+        if request.method in permissions.SAFE_METHODS:
             return True
         
         # Check if user is authenticated
