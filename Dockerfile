@@ -1,5 +1,4 @@
 # Dockerfile for Django API (HotelBookingEngine)
-# Use an official Python runtime as a parent image
 FROM python:3.12-slim
 
 # Set environment variables
@@ -33,15 +32,15 @@ RUN mkdir -p /app/logs /app/static /app/media && \
 RUN mkdir -p /app/hotel_booking/staticfiles && \
     chown -R appuser:appuser /app/hotel_booking
 
+# Make entrypoint executable before switching to non-root user
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Switch to non-root user
 USER appuser
 
 # Expose port 8000 for Gunicorn
 EXPOSE 8000
-
-# Make entrypoint executable and use it
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
 
 # Run entrypoint script
 ENTRYPOINT ["/app/entrypoint.sh"]

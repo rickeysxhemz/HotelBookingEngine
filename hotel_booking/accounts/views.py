@@ -15,7 +15,6 @@ from rest_framework import generics, status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 
@@ -25,7 +24,6 @@ from .serializers import (
     UserSerializer, UserRegistrationSerializer, LoginSerializer,
     PasswordChangeSerializer, UserUpdateSerializer,
 )
-from .services import TokenBlacklistService
 from bookings.models import Booking
 from bookings.serializers import BookingListSerializer
 
@@ -124,14 +122,11 @@ def login_api_view(request):
     user.failed_login_attempts = 0
     user.save(update_fields=['last_login_ip', 'failed_login_attempts'])
     
-    # Generate JWT tokens
-    refresh = RefreshToken.for_user(user)
-    
     return Response({
         'message': f'Welcome back, {user.get_short_name()}!',
         'tokens': {
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
+            'access': '',
+            'refresh': '',
         },
         'user': UserSerializer(user).data
     })
@@ -139,37 +134,10 @@ def login_api_view(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_api_view(request):
-    """Logout API endpoint with token blacklisting"""
-    refresh_token = request.data.get("refresh")
-    if not refresh_token:
-        return Response({'error': 'Refresh token is required for logout'}, 
-                       status=status.HTTP_400_BAD_REQUEST)
-    
-    # Get access token from Authorization header
-    access_token = None
-    auth_header = request.META.get('HTTP_AUTHORIZATION')
-    if auth_header and auth_header.startswith('Bearer '):
-        access_token = auth_header.split(' ')[1]
-    
-    try:
-        # Use the service to blacklist tokens
-        refresh_blacklisted, access_blacklisted = TokenBlacklistService.blacklist_token_pair(
-            refresh_token_str=refresh_token,
-            access_token_str=access_token,
-            user=request.user,
-            reason='logout'
-        )
-        
-        if not refresh_blacklisted:
-            return Response({'error': 'Invalid refresh token'}, 
-                           status=status.HTTP_400_BAD_REQUEST)
-        
-        return Response({'message': 'Successfully logged out. Tokens have been blacklisted.'}, 
-                       status=status.HTTP_200_OK)
-                
-    except Exception as e:
-        return Response({'error': f'Logout failed: {str(e)}'}, 
-                       status=status.HTTP_400_BAD_REQUEST)
+    """Logout API endpoint"""
+    from django.contrib.auth import logout
+    logout(request)
+    return Response({'message': 'Successfully logged out.'}, status=status.HTTP_200_OK)
 
 
 class ProfileAPIView(generics.RetrieveAPIView):
