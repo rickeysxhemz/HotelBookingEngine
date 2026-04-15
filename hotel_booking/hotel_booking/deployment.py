@@ -3,10 +3,9 @@
 from .settings import *
 import os
 
-# Security middleware configuration with WhiteNoise for static file serving
+# Security middleware configuration for production
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Static file serving
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -16,14 +15,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# WhiteNoise configuration for efficient static file serving
-WHITENOISE_COMPRESS_OFFLINE = True
-WHITENOISE_COMPRESSION_QUALITY = 80
-
 
 # --- Production-specific overrides ---
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
-SECRET_KEY = os.environ.get('SECRET_KEY')  # No fallback - MUST be set in environment
+SECRET_KEY = os.environ.get('SECRET_KEY') 
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is required in production!")
 
@@ -44,15 +39,6 @@ DATABASES = {
         }
     }
 }
-
-# Static files configuration
-STATIC_URL = '/static/'
-STATIC_ROOT = '/app/hotel_booking/staticfiles'
-STATICFILES_DIRS = ['/app/hotel_booking/manager/static'] if DEBUG else []
-
-# Media files configuration
-MEDIA_URL = '/media/'
-MEDIA_ROOT = '/app/media'
 
 # Email configuration for production
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')

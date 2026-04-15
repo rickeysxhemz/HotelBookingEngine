@@ -10,7 +10,7 @@ from rest_framework import generics, status, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
-from ratelimit.decorators import ratelimit
+from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 import logging
 

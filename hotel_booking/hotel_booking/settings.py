@@ -8,12 +8,11 @@ from datetime import timedelta
 from django.contrib.messages import constants as messages
 from decouple import config
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # Remove fallback for production security - SECRET_KEY must be set in environment
-SECRET_KEY = config('SECRET_KEY', default='a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0')
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -22,7 +21,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lamb
 
 # Application definition
 INSTALLED_APPS = [
-    'jazzmin',  # Django Jazzmin admin theme
+    'jazzmin',  
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -88,7 +87,7 @@ DATABASES = {
 # Redis and Caching configuration for production
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'BACKEND': 'django_redis.cache.RedisCache',
         'LOCATION': config('REDIS_URL', default='redis://redis:6379/0'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
@@ -96,8 +95,7 @@ CACHES = {
                 'max_connections': 50,
                 'retry_on_timeout': True,
             },
-            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
-            'IGNORE_EXCEPTIONS': True,  # Continue even if Redis is down
+            'IGNORE_EXCEPTIONS': True,
         },
         'KEY_PREFIX': 'hotel_booking',
         'TIMEOUT': 300,
