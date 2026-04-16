@@ -40,13 +40,16 @@ PY
 # 1) Wait for DB
 wait_for_db
 
-# 2) Apply all migrations (non-critical, allow failure for first run to create schema)
-python manage.py migrate || echo "Migration warning - this may be expected on first run"
+# 2) Apply all migrations (CRITICAL - must succeed)
+echo "Running migrations..."
+python manage.py migrate
 
 # 3) Collect static files (critical for WhiteNoise)
+echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
 # 4) Create superuser if missing
+echo "Setting up superuser..."
 create_superuser_if_missing
 
 # 5) Start Gunicorn
