@@ -232,11 +232,33 @@ class BookingForm(BaseForm):
         children = cleaned_data.get('children', 0)
         guest_email = cleaned_data.get('guest_email')
         guest_phone = cleaned_data.get('guest_phone')
+        instance_pk = self.instance.pk if self.instance else None
 
         # Validate dates
         if check_in_date and check_out_date:
             if check_in_date >= check_out_date:
                 raise forms.ValidationError('Check-out date must be after check-in date.')
+
+        # CRITICAL: Validate room availability (prevent overbooking)
+        if room and check_in_date and check_out_date:
+            from django.db.models import Q
+            # Find overlapping bookings (exclude current booking if editing)
+            overlapping_bookings = Booking.objects.filter(
+                Q(room=room) &
+                Q(status__in=['confirmed', 'pending']) &
+                Q(check_in_date__lt=check_out_date) &
+                Q(check_out_date__gt=check_in_date)
+            )
+            # Exclude current booking if editing
+            if instance_pk:
+                overlapping_bookings = overlapping_bookings.exclude(pk=instance_pk)
+            
+            if overlapping_bookings.exists():
+                existing_booking = overlapping_bookings.first()
+                raise forms.ValidationError(
+                    f'Room is already booked from {existing_booking.check_in_date} to {existing_booking.check_out_date}. '
+                    f'Please select a different room or dates.'
+                )
 
         # Validate room capacity
         if room and (adults + children) > room.capacity:
@@ -283,6 +305,26 @@ class RoomImageForm(BaseForm):
         'image_alt_text': 'e.g., Deluxe room with king bed',
         'caption': 'e.g., Spacious room with city view',
     }
+    
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        image = cleaned_data.get('image')
+        
+        if image:
+            # Validate file size
+            if image.size > self.MAX_FILE_SIZE:
+                raise forms.ValidationError(f'Image file is too large. Maximum size is 5MB, but you uploaded {image.size / 1024 / 1024:.2f}MB.')
+            
+            # Validate file extension
+            import os
+            ext = os.path.splitext(image.name)[1].lower().lstrip('.')
+            if ext not in self.ALLOWED_EXTENSIONS:
+                raise forms.ValidationError(f'Invalid file type. Allowed types: {', '.join(self.ALLOWED_EXTENSIONS)}')
+        
+        return cleaned_data
 
     class Meta:
         model = RoomImage
@@ -329,7 +371,19 @@ class OfferForm(BaseForm):
         # Limit category choices to active categories
         self.fields['category'].queryset = OfferCategory.objects.filter(is_active=True)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        valid_from = cleaned_data.get('valid_from')
+        valid_to = cleaned_data.get('valid_to')
 
+        # Validate date range
+        if valid_from and valid_to:
+            if valid_from > valid_to:
+                raise forms.ValidationError(
+                    'Offer start date (valid_from) must be before or equal to end date (valid_to).'
+                )
+
+        return cleaned_data
 
     class Meta:
         model = Offer
@@ -397,6 +451,32 @@ class OfferHighlightForm(BaseForm):
             'description': forms.Textarea(attrs={'rows': 3}),
         }
 
+class BulkBookingStatusForm(forms.Form):
+    STATUS_CHOICES = Booking.STATUS_CHOICES
+    
+    booking_ids = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=True,
+        help_text="Comma-separated booking IDs"
+    )
+    new_status = forms.ChoiceField(
+        choices=STATUS_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='New Status',
+        help_text='Select the status to apply to all selected bookings'
+    )
+    reason = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        required=False,
+        label='Reason for Status Change',
+        help_text='Optional reason for the bulk status update'
+    )
+    
+    def clean_booking_ids(self):
+        booking_ids = self.cleaned_data.get('booking_ids', '').strip()
+        if not booking_ids:
+            raise forms.ValidationError('At least one booking ID is required.')
+        return [id.strip() for id in booking_ids.split(',') if id.strip()]
 
 class OfferImageForm(BaseForm):
     """Form for creating and editing offer images"""
@@ -405,6 +485,9 @@ class OfferImageForm(BaseForm):
         'caption': 'e.g., Luxury suite with ocean view',
         'order': 'e.g., 1',
     }
+    
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
     
     def __init__(self, *args, **kwargs):
         self.offer_id = kwargs.pop('offer_id', None)
@@ -442,25 +525,48 @@ class OfferImageForm(BaseForm):
     
     def clean(self):
         cleaned_data = super().clean()
-        offer = cleaned_data.get('offer')
+        image = cleaned_data.get('image')
         
-        if not offer and self.offer_id:
-            # Try to get the offer from offer_id if not in cleaned_data
-            try:
-                offer = Offer.objects.get(id=self.offer_id)
-                cleaned_data['offer'] = offer
-            except Offer.DoesNotExist:
-                raise forms.ValidationError("Invalid offer selected.")
-        
-        if not offer:
-            raise forms.ValidationError("An offer must be selected.")
+        if image:
+            # Validate file size
+            if image.size > self.MAX_FILE_SIZE:
+                raise forms.ValidationError(f'Image file is too large. Maximum size is 5MB.')
+            
+            # Validate file extension
+            import os
+            ext = os.path.splitext(image.name)[1].lower().lstrip('.')
+            if ext not in self.ALLOWED_EXTENSIONS:
+                raise forms.ValidationError(f'Invalid file type. Allowed types: {", ".join(self.ALLOWED_EXTENSIONS)}')
         
         return cleaned_data
     
     class Meta:
         model = OfferImage
-        fields = ['offer', 'image', 'alt_text', 'caption', 'order', 'is_primary']
-        widgets = {
-            'image': forms.FileInput(attrs={'accept': 'image/*'}),
-        }
+        fields = ['offer', 'image', 'alt_text', 'caption', 'order']
 
+
+class RefundPolicyForm(BaseForm):
+    """Form for configuring hotel refund policies"""
+    
+    placeholder_mapping = {
+        'free_cancellation_days': 'e.g., 7 (free cancellation up to 7 days before check-in)',
+        'non_refundable_deposit_percentage': 'e.g., 10 (10/% service fee non-refundable)',
+        'policy_description': 'Guest-friendly explanation of refund policy',
+    }
+    
+    class Meta:
+        model = RefundPolicy
+        fields = [
+            'free_cancellation_days',
+            'refund_schedule',
+            'non_refundable_deposit_percentage',
+            'policy_description'
+        ]
+        widgets = {
+            'refund_schedule': forms.Textarea(attrs={
+                'rows': 6,
+                'placeholder': 'JSON format: {"7": 100, "3": 75, "1": 50, "0": 0}',
+                'help_text': 'Days before check-in: refund percentage'
+            }),
+            'policy_description': forms.Textarea(attrs={'rows': 4}),
+        }

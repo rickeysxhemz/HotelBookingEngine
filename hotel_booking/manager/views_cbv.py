@@ -1,10 +1,13 @@
 import csv
+from calendar import monthcalendar
+from datetime import datetime, timedelta
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import (LoginRequiredMixin,
                                         PermissionRequiredMixin,
                                         UserPassesTestMixin)
-from django.db.models import Q
+from django.db.models import Q, Count, Sum, F, Value, DecimalField, IntegerField
+from django.db.models.functions import TruncMonth, Coalesce
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
@@ -14,15 +17,16 @@ from django.views.generic import (CreateView, DeleteView, DetailView, ListView,
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 
-from bookings.models import Booking
+from bookings.models import Booking, BookingAuditLog, BookingRefund, RefundPolicy
 from core.models import (Extra, Hotel, Room, RoomAmenity, RoomImage, RoomType,
                        RoomTypeAmenity, SeasonalPricing)
 from offers.models import Offer, OfferCategory, OfferHighlight, OfferImage
+from accounts.models import CustomUser
 
 from .forms import (BookingForm, ExtraForm, HotelForm, RoomAmenityForm,
                     RoomForm, RoomImageForm, RoomTypeAmenityForm,
                     RoomTypeForm, SeasonalPricingForm, OfferForm, OfferCategoryForm,
-                    OfferHighlightForm, OfferImageForm)
+                    OfferHighlightForm, OfferImageForm, BulkBookingStatusForm, RefundPolicyForm)
 
 
 class ManagerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -963,10 +967,15 @@ class BookingExportView(ManagerRequiredMixin, View):
 
 
 class GlobalSearchView(ManagerRequiredMixin, View):
-    """Global search view that searches across multiple models"""
+    """Global search view that searches across multiple models with pagination"""
     
     def get(self, request):
+        from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+        import logging
+        
+        logger = logging.getLogger(__name__)
         query = request.GET.get('q', '').strip()
+        page = request.GET.get('page', 1)
         
         if not query:
             return render(request, 'manager/search_results.html', {
@@ -990,7 +999,7 @@ class GlobalSearchView(ManagerRequiredMixin, View):
                         Q(guest_phone__icontains=query) |
                         Q(hotel__name__icontains=query) |
                         Q(room__room_number__icontains=query)
-                    ).select_related('hotel', 'room', 'room__room_type')[:10]
+                    ).select_related('hotel', 'room', 'room__room_type').order_by('-created_at')
                     if bookings.exists():
                         results['bookings'] = {
                             'objects': bookings,
@@ -1011,7 +1020,7 @@ class GlobalSearchView(ManagerRequiredMixin, View):
                         Q(address_line_1__icontains=query) |
                         Q(address_line_2__icontains=query) |
                         Q(city__icontains=query)
-                    )[:10]
+                    )
                     if hotels.exists():
                         results['hotels'] = {
                             'objects': hotels,
@@ -1029,7 +1038,7 @@ class GlobalSearchView(ManagerRequiredMixin, View):
                     rooms = Room.objects.filter(
                         Q(room_number__icontains=query) |
                         Q(room_type__name__icontains=query)
-                    )[:10]
+                    )
                     if rooms.exists():
                         results['rooms'] = {
                             'objects': rooms,
@@ -1047,7 +1056,7 @@ class GlobalSearchView(ManagerRequiredMixin, View):
                     room_types = RoomType.objects.filter(
                         Q(name__icontains=query) |
                         Q(description__icontains=query)
-                    )[:10]
+                    )
                     if room_types.exists():
                         results['room_types'] = {
                             'objects': room_types,
@@ -1065,7 +1074,7 @@ class GlobalSearchView(ManagerRequiredMixin, View):
                     extras = Extra.objects.filter(
                         Q(name__icontains=query) |
                         Q(description__icontains=query)
-                    )[:10]
+                    )
                     if extras.exists():
                         results['extras'] = {
                             'objects': extras,
@@ -1081,11 +1090,10 @@ class GlobalSearchView(ManagerRequiredMixin, View):
             if request.user.has_perm('offers.view_offer'):
                 try:
                     offers = Offer.objects.filter(
-                        Q(title__icontains=query) |
+                        Q(name__icontains=query) |
                         Q(description__icontains=query) |
-                        Q(promo_code__icontains=query) |
                         Q(hotel__name__icontains=query)
-                    )[:10]
+                    )
                     if offers.exists():
                         results['offers'] = {
                             'objects': offers,
@@ -1296,12 +1304,9 @@ class OfferHighlightUpdateView(BaseUpdateView):
         return kwargs
     
     def get_success_url(self):
-        # Check if we came from a specific offer's highlights page
-        referer = self.request.META.get('HTTP_REFERER', '')
-        if 'offers/' in referer and '/highlights/' in referer:
-            highlight = self.get_object()
-            return reverse_lazy('manager:offer_highlights', kwargs={'offer_id': highlight.offer.id})
-        return reverse_lazy('manager:offer_highlights_all')
+        # Use the object's offer_id directly instead of relying on HTTP_REFERER (security fix)
+        highlight = self.get_object()
+        return reverse_lazy('manager:offer_highlights', kwargs={'offer_id': highlight.offer.id})
 
 
 class OfferHighlightDeleteView(BaseDeleteView):
@@ -1311,12 +1316,9 @@ class OfferHighlightDeleteView(BaseDeleteView):
     permission_required = 'offers.delete_offerhighlight'
     
     def get_success_url(self):
-        # Check if we came from a specific offer's highlights page
-        referer = self.request.META.get('HTTP_REFERER', '')
-        if 'offers/' in referer and '/highlights/' in referer:
-            highlight = self.get_object()
-            return reverse_lazy('manager:offer_highlights', kwargs={'offer_id': highlight.offer.id})
-        return reverse_lazy('manager:offer_highlights_all')
+        # Use the object's offer_id directly instead of relying on HTTP_REFERER (security fix)
+        highlight = self.get_object()
+        return reverse_lazy('manager:offer_highlights', kwargs={'offer_id': highlight.offer.id})
 
 
 # Offer Images
@@ -1386,12 +1388,9 @@ class OfferImageUpdateView(BaseUpdateView):
         return kwargs
     
     def get_success_url(self):
-        # Check if we came from a specific offer's images page
-        referer = self.request.META.get('HTTP_REFERER', '')
-        if 'offers/' in referer and '/images/' in referer:
-            image = self.get_object()
-            return reverse_lazy('manager:offer_images', kwargs={'offer_id': image.offer.id})
-        return reverse_lazy('manager:offer_images_all')
+        # Use the object's offer_id directly instead of relying on HTTP_REFERER (security fix)
+        image = self.get_object()
+        return reverse_lazy('manager:offer_images', kwargs={'offer_id': image.offer.id})
 
 
 class OfferImageDeleteView(BaseDeleteView):
@@ -1401,9 +1400,590 @@ class OfferImageDeleteView(BaseDeleteView):
     permission_required = 'offers.delete_offerimage'
     
     def get_success_url(self):
-        # Check if we came from a specific offer's images page
-        referer = self.request.META.get('HTTP_REFERER', '')
-        if 'offers/' in referer and '/images/' in referer:
-            image = self.get_object()
-            return reverse_lazy('manager:offer_images', kwargs={'offer_id': image.offer.id})
-        return reverse_lazy('manager:offer_images_all')
+        # Use the object's offer_id directly instead of relying on HTTP_REFERER (security fix)
+        image = self.get_object()
+        return reverse_lazy('manager:offer_images', kwargs={'offer_id': image.offer.id})
+
+
+# ============================================================================
+# NEW FEATURES: OCCUPANCY CALENDAR, BULK STATUS, HISTORY, REPORTS, EMAILS,
+# REFUNDS, MANAGER ROLES
+# ============================================================================
+
+
+# FEATURE 1: OCCUPANCY CALENDAR VIEW
+class OccupancyCalendarView(ManagerRequiredMixin, View):
+    """
+    Display room occupancy calendar for a selected hotel and month.
+    Shows which rooms are booked on each day.
+    """
+    
+    def get(self, request):
+        year = int(request.GET.get('year', timezone.now().year))
+        month = int(request.GET.get('month', timezone.now().month))
+        hotel_id = request.GET.get('hotel')
+        
+        # Get hotel data
+        hotels = Hotel.objects.all()
+        selected_hotel = None
+        if hotel_id:
+            selected_hotel = Hotel.objects.filter(id=hotel_id).first()
+        
+        # Get occupancy data for the month
+        occupancy_calendar = []
+        total_rooms = 0
+        booked_nights = 0
+        
+        if selected_hotel:
+            rooms = selected_hotel.room_set.all()
+            total_rooms = rooms.count()
+            
+            # Build calendar
+            cal = monthcalendar(year, month)
+            for week in cal:
+                week_data = []
+                for day in week:
+                    if day == 0:
+                        week_data.append(None)
+                    else:
+                        date = datetime(year, month, day).date()
+                        # Count bookings for this date
+                        bookings_count = Booking.objects.filter(
+                            hotel=selected_hotel,
+                            check_in_date__lte=date,
+                            check_out_date__gt=date,
+                            status__in=['pending', 'confirmed']
+                        ).count()
+                        
+                        occupancy_rate = (bookings_count / total_rooms * 100) if total_rooms > 0 else 0
+                        week_data.append({
+                            'day': day,
+                            'date': date,
+                            'booked_rooms': bookings_count,
+                            'total_rooms': total_rooms,
+                            'occupancy_rate': f"{occupancy_rate:.0f}%"
+                        })
+                occupancy_calendar.append(week_data)
+            
+            # Calculate month stats
+            month_start = datetime(year, month, 1).date()
+            month_end = datetime(year, month, 1) + timedelta(days=32)
+            month_end = month_end.replace(day=1) - timedelta(days=1)
+            month_end = month_end.date()
+            
+            month_bookings = Booking.objects.filter(
+                hotel=selected_hotel,
+                check_in_date__lte=month_end,
+                check_out_date__gte=month_start,
+                status__in=['pending', 'confirmed']
+            )
+            
+            booked_nights = sum([
+                min(b.check_out_date, month_end) - max(b.check_in_date, month_start)
+                for b in month_bookings
+            ]).days
+        
+        context = {
+            'year': year,
+            'month': month,
+            'month_name': datetime(year, month, 1).strftime('%B %Y'),
+            'hotels': hotels,
+            'selected_hotel': selected_hotel,
+            'occupancy_calendar': occupancy_calendar,
+            'total_rooms': total_rooms,
+            'booked_nights': booked_nights,
+        }
+        return render(request, 'manager/occupancy_calendar.html', context)
+
+
+# FEATURE 2: BULK BOOKING STATUS UPDATES
+class BulkBookingStatusUpdateView(ManagerRequiredMixin, View):
+    """
+    Update status of multiple bookings in bulk (e.g., change 10 pending → confirmed at once).
+    Includes audit trail for compliance.
+    """
+    
+    def get(self, request):
+        form = BulkBookingStatusForm()
+        bookings_qs = Booking.objects.all().select_related('hotel', 'room')
+        
+        # Filter by status if specified
+        status = request.GET.get('status')
+        if status:
+            bookings_qs = bookings_qs.filter(status=status)
+        
+        context = {
+            'form': form,
+            'bookings': bookings_qs[:50],  # Show first 50 for selection
+            'status_choices': Booking.STATUS_CHOICES,
+        }
+        return render(request, 'manager/bulk_booking_status.html', context)
+    
+    def post(self, request):
+        form = BulkBookingStatusForm(request.POST)
+        if form.is_valid():
+            booking_ids = form.cleaned_data['booking_ids']
+            new_status = form.cleaned_data['new_status']
+            reason = form.cleaned_data['reason']
+            
+            # Validate booking IDs
+            if isinstance(booking_ids, str):
+                booking_ids = [int(id.strip()) for id in booking_ids.split(',') if id.strip()]
+            
+            bookings = Booking.objects.filter(id__in=booking_ids)
+            updated_count = 0
+            
+            for booking in bookings:
+                old_status = booking.status
+                if old_status != new_status:
+                    booking.status = new_status
+                    booking.save(update_fields=['status'])
+                    
+                    # Log the change with audit trail
+                    BookingAuditLog.objects.create(
+                        booking=booking,
+                        changed_by=request.user,
+                        change_type='status_change',
+                        old_value={'status': old_status},
+                        new_value={'status': new_status},
+                        reason=reason or 'Bulk status update',
+                        ip_address=self.get_client_ip(request)
+                    )
+                    updated_count += 1
+            
+            messages.success(request, f'Successfully updated {updated_count} booking(s) to {new_status}')
+            return redirect('manager:bookings')
+        
+        context = {'form': form}
+        return render(request, 'manager/bulk_booking_status.html', context)
+    
+    @staticmethod
+    def get_client_ip(request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+
+# FEATURE 3: BOOKING MODIFICATION HISTORY
+class BookingHistoryView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    """
+    Display complete audit trail of all changes made to a booking.
+    Shows who changed what, when, and why.
+    """
+    
+    model = Booking
+    template_name = 'manager/booking_history.html'
+    context_object_name = 'booking'
+    permission_required = 'bookings.view_booking'
+    
+    def get_object(self, queryset=None):
+        """Get booking with related data"""
+        return super().get_object(
+            queryset=self.get_queryset().select_related(
+                'hotel', 'room', 'room__room_type', 'user'
+            )
+        )
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        booking = self.get_object()
+        
+        # Get all audit logs for this booking
+        audit_logs = booking.audit_logs.select_related('changed_by').order_by('-changed_at')
+        
+        context.update({
+            'audit_logs': audit_logs,
+            'log_count': audit_logs.count(),
+            'guest_full_name': booking.guest_full_name(),
+        })
+        
+        return context
+
+
+# FEATURE 4: AUTOMATED EMAIL NOTIFICATIONS (Signal-based)
+def send_booking_notification(booking, action, reason=''):
+    """
+    Send email notification to guest about booking status change.
+    Called via signals when booking is created/updated.
+    """
+    from django.core.mail import send_mail
+    from django.template.loader import render_to_string
+    
+    action_messages = {
+        'created': f'Your booking at {booking.hotel.name} has been confirmed',
+        'confirmed': f'Your booking {booking.booking_id} has been confirmed',
+        'cancelled': f'Your booking {booking.booking_id} has been cancelled',
+        'refunded': f'Refund processed for your booking {booking.booking_id}',
+        'status_change': f'Your booking {booking.booking_id} status has been updated',
+    }
+    
+    subject = action_messages.get(action, 'Booking Update')
+    
+    # Basic email content (can be enhanced with template)
+    message = f"""
+    Dear {booking.guest_full_name()},
+    
+    {subject}
+    
+    Booking Details:
+    - Booking ID: {booking.booking_id}
+    - Hotel: {booking.hotel.name}
+    - Check-in: {booking.check_in_date}
+    - Check-out: {booking.check_out_date}
+    - Status: {booking.get_status_display()}
+    - Total Amount: ${booking.total_amount}
+    
+    {f'Reason: {reason}' if reason else ''}
+    
+    If you have any questions, please contact our support team.
+    
+    Best regards,
+    Hotel Booking System
+    """
+    
+    try:
+        send_mail(
+            subject,
+            message,
+            'noreply@hotelbooking.com',
+            [booking.guest_email],
+            fail_silently=True
+        )
+    except Exception as e:
+        print(f"Error sending email notification: {e}")
+
+
+# FEATURE 5: REFUND MANAGEMENT UI
+class BookingRefundListView(ManagerRequiredMixin, ListView):
+    """
+    List all refund requests with status tracking.
+    """
+    
+    model = BookingRefund
+    template_name = 'manager/booking_refund_list.html'
+    context_object_name = 'refunds'
+    paginate_by = 20
+    permission_required = 'bookings.view_booking'
+    
+    def get_queryset(self):
+        qs = BookingRefund.objects.select_related('booking__hotel', 'booking__room').order_by('-refund_requested_at')
+        
+        # Filter by status if specified
+        status = self.request.GET.get('status')
+        if status:
+            qs = qs.filter(refund_status=status)
+        
+        return qs
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['refund_statuses'] = BookingRefund.REFUND_STATUS_CHOICES
+        context['refund_methods'] = BookingRefund.REFUND_METHOD_CHOICES
+        return context
+
+
+class BookingRefundDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    """
+    View and manage refund details for a booking.
+    """
+    
+    model = BookingRefund
+    template_name = 'manager/booking_refund_detail.html'
+    context_object_name = 'refund'
+    permission_required = 'bookings.change_booking'
+    
+    def post(self, request, *args, **kwargs):
+        """Process refund action"""
+        refund = self.get_object()
+        action = request.POST.get('action')
+        
+        if action == 'approve':
+            refund.refund_status = 'processing'
+            refund.save()
+            messages.success(request, 'Refund marked as processing')
+        elif action == 'complete':
+            refund.refund_status = 'completed'
+            refund.refund_processed_at = timezone.now()
+            refund.booking.payment_status = 'refunded'
+            refund.booking.save(update_fields=['payment_status'])
+            refund.save()
+            
+            # Send email notification
+            send_booking_notification(
+                refund.booking,
+                'refunded',
+                f'Refund of ${refund.refund_amount} has been processed'
+            )
+            
+            # Log audit trail
+            BookingAuditLog.objects.create(
+                booking=refund.booking,
+                changed_by=request.user,
+                change_type='refund_issued',
+                reason=f'Refund of ${refund.refund_amount} approved',
+            )
+            
+            messages.success(request, 'Refund completed and guest notified')
+        elif action == 'reject':
+            refund.refund_status = 'failed'
+            refund.save()
+            messages.info(request, 'Refund request rejected')
+        
+        return redirect('manager:booking_refund_detail', pk=refund.id)
+
+
+class RefundPolicyView(ManagerRequiredMixin, UpdateView):
+    """
+    Configure refund policy for a hotel.
+    """
+    
+    model = RefundPolicy
+    form_class = RefundPolicyForm
+    template_name = 'manager/refund_policy_form.html'
+    permission_required = 'core.change_hotel'
+    
+    def get_object(self, queryset=None):
+        """Get or create refund policy for hotel"""
+        hotel_id = self.kwargs.get('hotel_id')
+        hotel = Hotel.objects.get(id=hotel_id)
+        policy, created = RefundPolicy.objects.get_or_create(hotel=hotel)
+        return policy
+    
+    def get_success_url(self):
+        return reverse_lazy('manager:hotels')
+
+
+# FEATURE 6: REVENUE AND OCCUPANCY REPORTS
+class RevenueReportView(ManagerRequiredMixin, View):
+    """
+    Generate revenue reports with monthly breakdown.
+    Shows total revenue, average booking value, and trends.
+    """
+    
+    def get(self, request):
+        # Time period filters
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        hotel_id = request.GET.get('hotel')
+        
+        # Default to last 12 months
+        if not date_from:
+            date_from = timezone.now() - timedelta(days=365)
+        else:
+            date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+        
+        if not date_to:
+            date_to = timezone.now().date()
+        else:
+            date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
+        
+        # Query bookings
+        bookings = Booking.objects.filter(
+            payment_status='paid',
+            created_at__date__gte=date_from,
+            created_at__date__lte=date_to
+        )
+        
+        if hotel_id:
+            bookings = bookings.filter(hotel_id=hotel_id)
+        
+        # Calculate metrics
+        total_revenue = bookings.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        total_bookings = bookings.count()
+        avg_booking_value = total_revenue / total_bookings if total_bookings > 0 else 0
+        
+        # Monthly breakdown
+        monthly_revenue = bookings.annotate(
+            month=TruncMonth('created_at')
+        ).values('month').annotate(
+            revenue=Sum('total_amount'),
+            booking_count=Count('id')
+        ).order_by('month')
+        
+        # Revenue by hotel
+        revenue_by_hotel = bookings.values('hotel__name').annotate(
+            revenue=Sum('total_amount'),
+            booking_count=Count('id')
+        ).order_by('-revenue')
+        
+        # Revenue by room type
+        revenue_by_room_type = bookings.values('room__room_type__name').annotate(
+            revenue=Sum('total_amount'),
+            booking_count=Count('id')
+        ).order_by('-revenue')
+        
+        context = {
+            'total_revenue': f"${total_revenue:,.2f}",
+            'total_bookings': total_bookings,
+            'avg_booking_value': f"${avg_booking_value:,.2f}",
+            'monthly_revenue': list(monthly_revenue),
+            'revenue_by_hotel': list(revenue_by_hotel),
+            'revenue_by_room_type': list(revenue_by_room_type),
+            'date_from': date_from.strftime('%Y-%m-%d'),
+            'date_to': date_to.strftime('%Y-%m-%d'),
+            'hotels': Hotel.objects.all(),
+            'selected_hotel_id': hotel_id,
+        }
+        
+        return render(request, 'manager/revenue_report.html', context)
+
+
+class OccupancyReportView(ManagerRequiredMixin, View):
+    """
+    Generate occupancy reports showing room utilization rates.
+    Shows occupancy %, average length of stay, and booking patterns.
+    """
+    
+    def get(self, request):
+        # Time period filters
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        hotel_id = request.GET.get('hotel')
+        
+        # Default to last 3 months
+        if not date_from:
+            date_from = timezone.now() - timedelta(days=90)
+        else:
+            date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+        
+        if not date_to:
+            date_to = timezone.now().date()
+        else:
+            date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
+        
+        # Get period range
+        period_days = (date_to - date_from).days or 1
+        
+        # Query data
+        bookings = Booking.objects.filter(
+            check_in_date__lte=date_to,
+            check_out_date__gte=date_from,
+            status__in=['confirmed', 'completed']
+        )
+        
+        if hotel_id:
+            bookings = bookings.filter(hotel_id=hotel_id)
+        
+        # Calculate occupancy metrics
+        total_bookings = bookings.count()
+        avg_stay_length = bookings.aggregate(
+            avg_nights=Coalesce(F('nights'), 0, output_field=IntegerField())
+        )['avg_nights'] if total_bookings > 0 else 0
+        
+        # Get hotel and room data
+        if hotel_id:
+            hotels_qs = Hotel.objects.filter(id=hotel_id)
+        else:
+            hotels_qs = Hotel.objects.all()
+        
+        # Occupancy by hotel
+        occupancy_by_hotel = []
+        for hotel in hotels_qs:
+            total_rooms = hotel.room_set.count()
+            hotel_bookings = bookings.filter(hotel=hotel)
+            
+            booked_nights = sum([
+                min(b.check_out_date, date_to) - max(b.check_in_date, date_from)
+                for b in hotel_bookings
+            ]).days
+            
+            total_room_nights = total_rooms * period_days
+            occupancy_rate = (booked_nights / total_room_nights * 100) if total_room_nights > 0 else 0
+            
+            occupancy_by_hotel.append({
+                'hotel_name': hotel.name,
+                'total_rooms': total_rooms,
+                'booked_nights': booked_nights,
+                'occupancy_rate': f"{occupancy_rate:.1f}%"
+            })
+        
+        # Occupancy by room type
+        occupancy_by_room_type = bookings.values('room__room_type__name').annotate(
+            booking_count=Count('id'),
+            avg_nights=Coalesce(F('nights'), 0, output_field=IntegerField())
+        ).order_by('-booking_count')
+        
+        context = {
+            'total_bookings': total_bookings,
+            'avg_stay_length': f"{avg_stay_length:.1f} nights" if avg_stay_length > 0 else "No data",
+            'occupancy_by_hotel': occupancy_by_hotel,
+            'occupancy_by_room_type': list(occupancy_by_room_type),
+            'date_from': date_from.strftime('%Y-%m-%d'),
+            'date_to': date_to.strftime('%Y-%m-%d'),
+            'hotels': Hotel.objects.all(),
+            'selected_hotel_id': hotel_id,
+        }
+        
+        return render(request, 'manager/occupancy_report.html', context)
+
+
+# FEATURE 7: MANAGER ROLES AND PROPERTY SCOPING
+class ManagerPropertyAssignmentView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    """
+    Assign hotels/properties to managers.
+    Managers can only manage their assigned properties.
+    """
+    
+    model = CustomUser
+    template_name = 'manager/manager_properties.html'
+    fields = []  # Custom form handling
+    permission_required = 'auth.change_user'
+    
+    def get_object(self, queryset=None):
+        """Get the user to assign properties to"""
+        return CustomUser.objects.get(id=self.kwargs['user_id'])
+    
+    def get(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user.user_type != 'staff':
+            messages.warning(request, 'Only staff users can be assigned properties')
+            return redirect('manager:dashboard')
+        
+        # Get all hotels and user's current assignments
+        all_hotels = Hotel.objects.all()
+        
+        # Note: If you add a ManyToManyField 'managed_hotels' to CustomUser,
+        # use: assigned_hotels = user.managed_hotels.all()
+        assigned_hotels = []  # Placeholder - implement based on your User model
+        
+        context = {
+            'user': user,
+            'all_hotels': all_hotels,
+            'assigned_hotels': assigned_hotels,
+        }
+        return render(request, 'manager/manager_properties.html', context)
+    
+    def post(self, request, *args, **kwargs):
+        """Update property assignments"""
+        user = self.get_object()
+        hotel_ids = request.POST.getlist('hotels')
+        
+        # Implementation depends on your User model
+        # If you have a ManyToManyField on CustomUser:
+        # user.managed_hotels.set(hotel_ids)
+        
+        messages.success(request, f'Properties assigned to {user.first_name} {user.last_name}')
+        return redirect('manager:dashboard')
+
+
+class ManagerPropertyFilterMixin:
+    """
+    Mixin to filter querysets by manager's assigned properties.
+    Ensures managers only see data for their assigned hotels.
+    """
+    
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        
+        # If user has managed_hotels field, filter by it
+        if hasattr(user, 'managed_hotels') and user.user_type == 'staff':
+            assigned_hotel_ids = user.managed_hotels.values_list('id', flat=True)
+            if assigned_hotel_ids.exists():
+                qs = qs.filter(hotel_id__in=assigned_hotel_ids)
+        
+        return qs

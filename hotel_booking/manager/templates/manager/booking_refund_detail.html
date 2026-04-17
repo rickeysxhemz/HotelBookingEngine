@@ -1,0 +1,182 @@
+{% extends "manager/base.html" %}
+{% load static %}
+
+{% block title %}Refund Details - {{ refund.booking.booking_id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid my-4">
+    <div class="row mb-4">
+        <div class="col">
+            <a href="{% url 'manager:booking_refunds' %}" class="btn btn-sm btn-secondary mb-3">
+                <i class="fas fa-arrow-left"></i> Back to Refunds
+            </a>
+            <h1>Refund Details</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Booking & Guest Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p><strong>Booking ID:</strong> {{ refund.booking.booking_id }}</p>
+                            <p><strong>Guest Name:</strong> {{ refund.booking.guest_full_name }}</p>
+                            <p><strong>Email:</strong> {{ refund.booking.guest_email }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Hotel:</strong> {{ refund.booking.hotel.name }}</p>
+                            <p><strong>Room:</strong> {{ refund.booking.room.room_type.name }} #{{ refund.booking.room.room_number }}</p>
+                            <p><strong>Check-in:</strong> {{ refund.booking.check_in_date|date:"M d, Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Refund Financial Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p>
+                                <strong>Total Booking Amount:</strong> 
+                                <span class="text-primary">${{ refund.booking.total_amount }}</span>
+                            </p>
+                            <p>
+                                <strong>Refund Amount:</strong> 
+                                <span class="text-success">${{ refund.refund_amount }}</span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p>
+                                <strong>Non-Refundable Amount:</strong> 
+                                <span class="text-warning">${{ refund.non_refundable_amount }}</span>
+                            </p>
+                            <p>
+                                <strong>Refund Percentage:</strong>
+                                {% widthratio refund.refund_amount refund.booking.total_amount 100 %}%
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Refund Details</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>Status:</strong> 
+                        {% if refund.refund_status == 'pending' %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% elif refund.refund_status == 'processing' %}
+                            <span class="badge bg-info">Processing</span>
+                        {% elif refund.refund_status == 'completed' %}
+                            <span class="badge bg-success">Completed</span>
+                        {% else %}
+                            <span class="badge bg-danger">Failed</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Method:</strong> {{ refund.get_refund_method_display }}</p>
+                    <p><strong>Reason:</strong></p>
+                    <p class="text-muted">{{ refund.refund_reason }}</p>
+                    {% if refund.notes %}
+                    <p><strong>Internal Notes:</strong></p>
+                    <p class="text-muted">{{ refund.notes }}</p>
+                    {% endif %}
+                    <p>
+                        <strong>Requested:</strong> {{ refund.refund_requested_at|date:"M d, Y H:i:s" }}
+                        {% if refund.refund_processed_at %}
+                        <br><strong>Processed:</strong> {{ refund.refund_processed_at|date:"M d, Y H:i:s" }}
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            {% if refund.refund_status != 'completed' and refund.refund_status != 'failed' %}
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="d-flex gap-2">
+                        {% csrf_token %}
+                        {% if refund.refund_status == 'pending' %}
+                            <button type="submit" name="action" value="approve" class="btn btn-warning">
+                                <i class="fas fa-clock"></i> Mark as Processing
+                            </button>
+                        {% endif %}
+                        {% if refund.refund_status == 'processing' %}
+                            <button type="submit" name="action" value="complete" class="btn btn-success">
+                                <i class="fas fa-check-circle"></i> Mark as Completed
+                            </button>
+                        {% endif %}
+                        <button type="submit" name="action" value="reject" class="btn btn-danger">
+                            <i class="fas fa-times-circle"></i> Reject Refund
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Status Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item">
+                            <small class="text-muted">Requested</small>
+                            <p class="mb-0">{{ refund.refund_requested_at|date:"M d, Y H:i" }}</p>
+                        </div>
+                        {% if refund.refund_status == 'processing' or refund.refund_status == 'completed' or refund.refund_status == 'failed' %}
+                        <div class="list-group-item">
+                            <small class="text-muted">Processing Started</small>
+                            <p class="mb-0">
+                                {% if refund.refund_processed_at %}
+                                    {{ refund.refund_processed_at|date:"M d, Y H:i" }}
+                                {% else %}
+                                    <em>Pending...</em>
+                                {% endif %}
+                            </p>
+                        </div>
+                        {% endif %}
+                        {% if refund.refund_status == 'completed' %}
+                        <div class="list-group-item">
+                            <small class="text-muted">Completed</small>
+                            <p class="mb-0">{{ refund.refund_processed_at|date:"M d, Y H:i" }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Quick Info</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        <strong>Transaction ID:</strong>
+                        <br>
+                        {% if refund.transaction_id %}
+                            <code>{{ refund.transaction_id }}</code>
+                        {% else %}
+                            <em class="text-muted">Not set</em>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

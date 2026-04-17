@@ -103,4 +103,29 @@ urlpatterns = [
 
     # Global search
     path('search/', views_cbv.GlobalSearchView.as_view(), name='global_search'),
+    
+    # ========== NEW FEATURE URLS ==========
+    
+    # 1. Occupancy Calendar
+    path('calendar/', views_cbv.OccupancyCalendarView.as_view(), name='occupancy_calendar'),
+    
+    # 2. Bulk Booking Status Updates
+    path('bookings/bulk-status/', views_cbv.BulkBookingStatusUpdateView.as_view(), name='bulk_booking_status'),
+    
+    # 3. Booking Modification History
+    path('bookings/<int:pk>/history/', views_cbv.BookingHistoryView.as_view(), name='booking_history'),
+    
+    # 4. Email Notifications (automatic via signals, no separate URL needed)
+    
+    # 5. Refund Management
+    path('refunds/', views_cbv.BookingRefundListView.as_view(), name='booking_refunds'),
+    path('refunds/<int:pk>/', views_cbv.BookingRefundDetailView.as_view(), name='booking_refund_detail'),
+    path('hotels/<uuid:hotel_id>/refund-policy/', views_cbv.RefundPolicyView.as_view(), name='refund_policy'),
+    
+    # 6. Reports
+    path('reports/revenue/', views_cbv.RevenueReportView.as_view(), name='revenue_report'),
+    path('reports/occupancy/', views_cbv.OccupancyReportView.as_view(), name='occupancy_report'),
+    
+    # 7. Manager Roles and Property Scoping
+    path('managers/<uuid:user_id>/properties/', views_cbv.ManagerPropertyAssignmentView.as_view(), name='manager_properties'),
 ]

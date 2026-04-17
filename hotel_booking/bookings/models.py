@@ -10,6 +10,23 @@ import string
 User = get_user_model()
 
 
+class BookingQuerySet(models.QuerySet):
+    """Custom QuerySet for Booking that filters out soft-deleted records by default"""
+    
+    def active(self):
+        return self.filter(is_deleted=False)
+    
+    def deleted(self):
+        return self.filter(is_deleted=True)
+
+
+class BookingManager(models.Manager):
+    """Custom manager for Booking that excludes soft-deleted records by default"""
+    
+    def get_queryset(self):
+        return BookingQuerySet(self.model, using=self._db).filter(is_deleted=False)
+
+
 class Booking(models.Model):
     """
     Production-grade booking model with optimistic locking and comprehensive indexing.
@@ -151,8 +168,14 @@ class Booking(models.Model):
         blank=True,
         related_name='bookings'
     )
+        # Soft delete fields for data recovery and audit trail
+    is_deleted = models.BooleanField(default=False, db_index=True, help_text=\"Whether booking is soft-deleted\")
+    deleted_at = models.DateTimeField(null=True, blank=True, help_text=\"Timestamp of soft deletion\")
+    deleted_reason = models.CharField(max_length=500, blank=True, null=True, help_text=\"Reason for deletion\")
     
-    class Meta:
+    # Custom manager that excludes soft-deleted records by default
+    objects = BookingManager()
+        class Meta:
         db_table = 'booking'
         ordering = ['-created_at']
         # Comprehensive indexes for high-concurrency production environment
@@ -188,6 +211,8 @@ class Booking(models.Model):
             
             # Status tracking for automation
             models.Index(fields=['status', 'created_at'], name='idx_status_created'),
+            # Soft delete index
+            models.Index(fields=['is_deleted'], name='idx_is_deleted'),
         ]
     
     def save(self, *args, **kwargs):
@@ -248,6 +273,25 @@ class Booking(models.Model):
         """Return guest's full name"""
         return f"{self.guest_first_name} {self.guest_last_name}"
     
+    def soft_delete(self, reason=''):
+        """Soft delete this booking - marks as deleted instead of permanent deletion"""
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.deleted_reason = reason
+        self.save(update_fields=['is_deleted', 'deleted_at', 'deleted_reason'])
+    
+    def restore(self):
+        """Restore a soft-deleted booking"""
+        if self.is_deleted:
+            self.is_deleted = False
+            self.deleted_at = None
+            self.deleted_reason = None
+            self.save(update_fields=['is_deleted', 'deleted_at', 'deleted_reason'])
+    
+    def delete(self, *args, **kwargs):
+        """Override delete to perform soft delete instead of hard delete"""
+        self.soft_delete(reason='Deleted via manager')
+    
     def guest_address_formatted(self):
         """Return formatted address"""
         return f"{self.guest_address}, {self.guest_city}, {self.guest_postal_code}, {self.guest_country}"
@@ -288,6 +332,8 @@ class BookingAuditLog(models.Model):
         ('confirmed', 'Booking Confirmed'),
         ('cancelled', 'Booking Cancelled'),
         ('completed', 'Booking Completed'),
+        ('deleted', 'Booking Soft-Deleted'),
+        ('restored', 'Booking Restored'),
     ]
     
     booking = models.ForeignKey(

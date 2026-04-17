@@ -45,6 +45,7 @@ services:
       - "-"
     working_dir: /app/hotel_booking
     volumes:
+      - .:/app  # Mount code directory for development
       - static_volume:/app/hotel_booking/staticfiles
       - media_volume:/app/media
       - logs_volume:/app/logs

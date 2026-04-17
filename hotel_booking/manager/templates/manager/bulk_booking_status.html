@@ -1,0 +1,196 @@
+{% extends "manager/base.html" %}
+{% load static %}
+
+{% block title %}Bulk Booking Status Update{% endblock %}
+
+{% block content %}
+<div class="container-fluid my-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Bulk Update Booking Status</h1>
+            <p class="text-muted">Change status for multiple bookings at once (e.g., mark 10 pending bookings as confirmed)</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.new_status.id_for_label }}" class="form-label">
+                                {{ form.new_status.label }}
+                            </label>
+                            {{ form.new_status }}
+                            {% if form.new_status.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.new_status.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.reason.id_for_label }}" class="form-label">
+                                {{ form.reason.label }}
+                            </label>
+                            {{ form.reason }}
+                            {% if form.reason.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.reason.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong><i class="fas fa-info-circle"></i> Instructions:</strong>
+                            <ol class="mb-0">
+                                <li>Select bookings from the list below (checkboxes)</li>
+                                <li>Choose the new status</li>
+                                <li>Optionally add a reason for the change</li>
+                                <li>Click "Update Status" to apply changes</li>
+                            </ol>
+                        </div>
+
+                        <input type="hidden" name="booking_ids" id="booking_ids">
+
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-sm btn-secondary" id="selectAll">
+                                <i class="fas fa-check-square"></i> Select All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="clearAll">
+                                <i class="fas fa-square"></i> Clear All
+                            </button>
+                            <span class="ms-3">
+                                <strong>Selected: <span id="selectedCount">0</span> bookings</strong>
+                            </span>
+                        </div>
+
+                        <div class="table-responsive mb-3">
+                            <table class="table table-hover" id="bookingsTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="50">
+                                            <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                                        </th>
+                                        <th>Booking ID</th>
+                                        <th>Guest Name</th>
+                                        <th>Hotel</th>
+                                        <th>Check-in</th>
+                                        <th>Current Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in bookings %}
+                                    <tr class="booking-row">
+                                        <td>
+                                            <input type="checkbox" class="booking-checkbox form-check-input" 
+                                                   value="{{ booking.id }}" data-booking-id="{{ booking.id }}">
+                                        </td>
+                                        <td><strong>{{ booking.booking_id }}</strong></td>
+                                        <td>{{ booking.guest_full_name }}</td>
+                                        <td>{{ booking.hotel.name }}</td>
+                                        <td>{{ booking.check_in_date|date:"M d, Y" }}</td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ booking.get_status_display }}</span>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">
+                                            No bookings available. Try filtering by status first.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" id="updateBtn">
+                                <i class="fas fa-sync-alt"></i> Update Status
+                            </button>
+                            <a href="{% url 'manager:bookings' %}" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Filter by Status</h5>
+                </div>
+                <div class="card-body">
+                    {% for value, label in status_choices %}
+                    <a href="?status={{ value }}" class="btn btn-outline-primary btn-sm d-block mb-2">
+                        {{ label }}
+                    </a>
+                    {% endfor %}
+                    <a href="?status=" class="btn btn-outline-secondary btn-sm d-block">
+                        Clear Filter
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.booking-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const bookingIdsInput = document.getElementById('booking_ids');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    const updateBtn = document.getElementById('updateBtn');
+
+    function updateSelectedCount() {
+        const selected = document.querySelectorAll('.booking-checkbox:checked').length;
+        selectedCountSpan.textContent = selected;
+        updateBtn.disabled = selected === 0;
+    }
+
+    function updateBookingIds() {
+        const ids = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+        bookingIdsInput.value = ids.join(',');
+        updateSelectedCount();
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateBookingIds);
+    });
+
+    selectAllCheckbox.addEventListener('change', function() {
+        checkboxes.forEach(cb => cb.checked = this.checked);
+        updateBookingIds();
+    });
+
+    document.getElementById('selectAll').addEventListener('click', function() {
+        checkboxes.forEach(cb => cb.checked = true);
+        selectAllCheckbox.checked = true;
+        updateBookingIds();
+    });
+
+    document.getElementById('clearAll').addEventListener('click', function() {
+        checkboxes.forEach(cb => cb.checked = false);
+        selectAllCheckbox.checked = false;
+        updateBookingIds();
+    });
+
+    // Initial state
+    updateSelectedCount();
+});
+</script>
+
+<style>
+    .booking-row:hover {
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
