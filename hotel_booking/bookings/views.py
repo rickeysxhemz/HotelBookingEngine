@@ -25,7 +25,8 @@ from .serializers import (
     BookingCreateSerializer,
     BookingUpdateSerializer,
     BookingListSerializer,
-    BookingQuickSerializer
+    BookingQuickSerializer,
+    BookingAuditLogSerializer
 )
 from .services import RoomAvailabilityService
 from .booking_services import (
