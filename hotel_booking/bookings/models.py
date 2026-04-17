@@ -270,3 +270,283 @@ class Booking(models.Model):
     
     def __str__(self):
         return f"{self.booking_id} - {self.guest_full_name()} ({self.hotel.name})"
+
+
+class BookingAuditLog(models.Model):
+    """
+    Audit trail for all booking changes.
+    Tracks WHO changed WHAT, WHEN, and WHY for compliance and dispute resolution.
+    """
+    
+    CHANGE_TYPE_CHOICES = [
+        ('created', 'Booking Created'),
+        ('status_change', 'Status Changed'),
+        ('payment_status_change', 'Payment Status Changed'),
+        ('details_updated', 'Details Updated'),
+        ('price_adjusted', 'Price Adjusted'),
+        ('refund_issued', 'Refund Issued'),
+        ('confirmed', 'Booking Confirmed'),
+        ('cancelled', 'Booking Cancelled'),
+        ('completed', 'Booking Completed'),
+    ]
+    
+    booking = models.ForeignKey(
+        Booking,
+        on_delete=models.CASCADE,
+        related_name='audit_logs'
+    )
+    
+    # Who made the change
+    changed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='booking_changes',
+        help_text="User who made this change (null if system automated)"
+    )
+    
+    # What changed
+    change_type = models.CharField(
+        max_length=50,
+        choices=CHANGE_TYPE_CHOICES
+    )
+    
+    # Old and new values
+    old_value = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Previous value before change"
+    )
+    new_value = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="New value after change"
+    )
+    
+    # Why changed
+    reason = models.TextField(
+        blank=True,
+        help_text="Reason for the change (e.g., 'Guest requested refund', 'System automation')"
+    )
+    
+    # When changed
+    changed_at = models.DateTimeField(auto_now_add=True)
+    
+    # IP address for security tracking
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        help_text="IP address where change was made"
+    )
+    
+    class Meta:
+        db_table = 'booking_audit_log'
+        ordering = ['-changed_at']
+        indexes = [
+            models.Index(fields=['booking', 'changed_at'], name='idx_booking_auditlog'),
+            models.Index(fields=['changed_by', 'changed_at'], name='idx_user_auditlog'),
+            models.Index(fields=['change_type', 'changed_at'], name='idx_type_auditlog'),
+        ]
+    
+    def __str__(self):
+        return f"{self.booking.booking_id} - {self.get_change_type_display()} by {self.changed_by or 'System'}"
+
+
+class RefundPolicy(models.Model):
+    """
+    Cancellation and refund policy for hotels.
+    Determines refund amounts based on days before check-in.
+    """
+    
+    hotel = models.OneToOneField(
+        Hotel,
+        on_delete=models.CASCADE,
+        related_name='refund_policy',
+        help_text="Hotel this policy applies to"
+    )
+    
+    # Cancellation deadline and policy
+    free_cancellation_days = models.PositiveIntegerField(
+        default=1,
+        help_text="Days before check-in when cancellation is free (e.g., 1 = free until 24 hours before)"
+    )
+    
+    # Refund tiers based on days before check-in
+    # Format: {days: refund_percentage}
+    # Example: 7 days before = 75% refund, 3 days before = 50% refund
+    refund_schedule = models.JSONField(
+        default=dict,
+        help_text="Refund % by days before check-in. E.g., {'7': 75, '3': 50, '0': 0}"
+    )
+    
+    # Non-refundable deposit
+    non_refundable_deposit_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0.0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Percentage of booking that is non-refundable (e.g., 10% service fee)"
+    )
+    
+    # Policy description
+    policy_description = models.TextField(
+        blank=True,
+        help_text="Human-readable policy description for guests"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'refund_policy'
+    
+    def __str__(self):
+        return f"Refund Policy - {self.hotel.name}"
+    
+    def calculate_refund(self, booking):
+        """
+        Calculate refund amount based on cancellation date and policy.
+        
+        Args:
+            booking: Booking instance being cancelled
+        
+        Returns:
+            {
+                'refund_amount': Decimal,
+                'refund_percentage': int,
+                'non_refundable_amount': Decimal,
+                'reason': str
+            }
+        """
+        from datetime import timedelta
+        
+        # Check if booking is eligible for refund
+        if booking.payment_status != 'paid':
+            return {
+                'refund_amount': 0,
+                'refund_percentage': 0,
+                'non_refundable_amount': booking.total_amount,
+                'reason': 'Booking not yet paid'
+            }
+        
+        # Calculate days until check-in
+        days_until_checkin = (booking.check_in_date - timezone.now().date()).days
+        
+        # Check if within free cancellation period
+        if days_until_checkin >= self.free_cancellation_days:
+            return {
+                'refund_amount': booking.total_amount,
+                'refund_percentage': 100,
+                'non_refundable_amount': 0,
+                'reason': f'Full refund - within {self.free_cancellation_days} day free cancellation period'
+            }
+        
+        # Find applicable refund percentage from schedule
+        refund_percentage = 0
+        refund_reason = ''
+        
+        # Parse refund schedule and find applicable tier
+        for days_str, percentage in sorted(self.refund_schedule.items(), reverse=True):
+            days_threshold = int(days_str)
+            if days_until_checkin >= days_threshold:
+                refund_percentage = percentage
+                refund_reason = f'{percentage}% refund - {days_until_checkin} days before check-in'
+                break
+        
+        # If no tier matched (too late), apply zero refund
+        if refund_percentage == 0:
+            refund_reason = f'No refund - within {list(self.refund_schedule.keys())[-1]} days of check-in'
+        
+        # Calculate refund amount
+        refund_amount = booking.total_amount * (refund_percentage / 100)
+        non_refundable = booking.total_amount - refund_amount
+        
+        # Ensure at least the non-refundable deposit is deducted
+        non_refundable_deposit = booking.total_amount * (self.non_refundable_deposit_percentage / 100)
+        if non_refundable < non_refundable_deposit:
+            non_refundable = non_refundable_deposit
+            refund_amount = booking.total_amount - non_refundable
+        
+        return {
+            'refund_amount': refund_amount,
+            'refund_percentage': refund_percentage,
+            'non_refundable_amount': non_refundable,
+            'reason': refund_reason
+        }
+
+
+class BookingRefund(models.Model):
+    """
+    Record of refund transactions for bookings.
+    Tracks refund status, amount, and method.
+    """
+    
+    REFUND_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    REFUND_METHOD_CHOICES = [
+        ('original_payment', 'Original Payment Method'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('credit', 'Hotel Credit'),
+        ('manual', 'Manual (No Auto-Refund)'),
+    ]
+    
+    booking = models.OneToOneField(
+        Booking,
+        on_delete=models.CASCADE,
+        related_name='refund',
+        help_text="Associated booking being refunded"
+    )
+    
+    # Refund amount and status
+    refund_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Amount to be refunded to guest"
+    )
+    
+    non_refundable_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Amount retained by hotel"
+    )
+    
+    refund_status = models.CharField(
+        max_length=20,
+        choices=REFUND_STATUS_CHOICES,
+        default='pending'
+    )
+    
+    refund_method = models.CharField(
+        max_length=30,
+        choices=REFUND_METHOD_CHOICES,
+        default='original_payment'
+    )
+    
+    # Refund details
+    refund_reason = models.TextField(help_text="Reason for refund")
+    
+    # Transaction tracking
+    transaction_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Payment processor transaction ID for refund"
+    )
+    
+    # Timestamps
+    refund_requested_at = models.DateTimeField(auto_now_add=True)
+    refund_processed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Notes
+    notes = models.TextField(blank=True, help_text="Internal notes about refund")
+    
+    class Meta:
+        db_table = 'booking_refund'
+    
+    def __str__(self):
+        return f"Refund - {self.booking.booking_id}: ${self.refund_amount}"

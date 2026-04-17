@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 from decimal import Decimal
-from .models import Booking
+from .models import Booking, BookingAuditLog
 from core.models import Hotel, Room
 
 
@@ -381,3 +381,28 @@ class BookingQuickSerializer(serializers.ModelSerializer):
     
     def get_guest_full_name(self, obj):
         return obj.guest_full_name()
+
+
+class BookingAuditLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer for booking audit logs (compliance and dispute resolution)
+    """
+    
+    changed_by_username = serializers.CharField(source='changed_by.username', read_only=True, allow_null=True)
+    changed_by_email = serializers.CharField(source='changed_by.email', read_only=True, allow_null=True)
+    change_type_display = serializers.CharField(source='get_change_type_display', read_only=True)
+    
+    class Meta:
+        model = BookingAuditLog
+        fields = [
+            'id', 'booking', 'change_type', 'change_type_display',
+            'old_value', 'new_value', 'reason',
+            'changed_by', 'changed_by_username', 'changed_by_email',
+            'ip_address', 'changed_at'
+        ]
+        read_only_fields = [
+            'id', 'booking', 'change_type', 'change_type_display',
+            'old_value', 'new_value', 'reason',
+            'changed_by', 'changed_by_username', 'changed_by_email',
+            'ip_address', 'changed_at'
+        ]

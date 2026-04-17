@@ -230,6 +230,8 @@ class BookingForm(BaseForm):
         room = cleaned_data.get('room')
         adults = cleaned_data.get('adults', 0)
         children = cleaned_data.get('children', 0)
+        guest_email = cleaned_data.get('guest_email')
+        guest_phone = cleaned_data.get('guest_phone')
 
         # Validate dates
         if check_in_date and check_out_date:
@@ -239,6 +241,24 @@ class BookingForm(BaseForm):
         # Validate room capacity
         if room and (adults + children) > room.capacity:
             raise forms.ValidationError(f'Total guests ({adults + children}) exceed room capacity ({room.capacity}).')
+
+        # Validate email format (comprehensive check)
+        if guest_email:
+            import re
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, guest_email):
+                raise forms.ValidationError('Please enter a valid email address (e.g., john@example.com).')
+
+        # Validate phone number (comprehensive check)
+        if guest_phone:
+            import re
+            # Phone pattern: allows formats like +1-555-0123, (555) 012-3456, +1 555 0123, etc.
+            # Requires at least 7 digits
+            digits_only = re.sub(r'\D', '', guest_phone)
+            if len(digits_only) < 7:
+                raise forms.ValidationError('Please enter a valid phone number with at least 7 digits.')
+            if len(digits_only) > 15:
+                raise forms.ValidationError('Phone number appears to be invalid (too long).')
 
         return cleaned_data
 

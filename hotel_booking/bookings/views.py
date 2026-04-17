@@ -5,18 +5,21 @@ Optimized for production with high concurrency, async tasks, and rate limiting.
 from django.utils import timezone
 from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
+from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, status, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.decorators import action
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 import logging
 
 from django.contrib.auth import get_user_model
 from core.models import Room
-from .models import Booking
+from .models import Booking, BookingAuditLog
 from .serializers import (
     BookingSerializer,
     BookingCreateSerializer,
@@ -25,6 +28,12 @@ from .serializers import (
     BookingQuickSerializer
 )
 from .services import RoomAvailabilityService
+from .booking_services import (
+    RoomReservationService,
+    BookingConfirmationService,
+    BookingCancellationService,
+    BookingAuditService
+)
 from .tasks import send_confirmation_email_async, send_cancellation_email_async
 
 # Get User model
@@ -44,12 +53,13 @@ class BookingPagination(PageNumberPagination):
 def send_booking_confirmation_email(booking):
     """
     Send booking confirmation email to the guest.
+    Raises exception on failure so caller can handle error properly.
     
     Args:
         booking: Booking instance
     
     Returns:
-        bool: True if email sent successfully, False otherwise
+        tuple: (success: bool, error_message: str or None)
     """
     try:
         # Prepare email data
@@ -172,15 +182,16 @@ def send_booking_confirmation_email(booking):
             from_email=from_email,
             recipient_list=recipient_list,
             html_message=html_message,
-            fail_silently=False,
+            fail_silently=False,  # Will raise exception on failure
         )
         
         logger.info(f"Booking confirmation email sent successfully to {booking.guest_email} for booking {booking.booking_id}")
-        return True
+        return True, None
         
     except Exception as e:
-        logger.error(f"Failed to send booking confirmation email to {booking.guest_email}: {str(e)}")
-        return False
+        error_msg = f"Failed to send booking confirmation email: {str(e)}"
+        logger.error(error_msg)
+        return False, error_msg
 
 
 def send_booking_cancellation_email(booking):
@@ -438,12 +449,11 @@ class BookingListAPIView(generics.ListAPIView):
 @method_decorator(ratelimit(key='user', rate='10/h', method='POST'), 'dispatch')
 class BookingCreateAPIView(generics.CreateAPIView):
     """
-    Create a new booking with availability checking and async email confirmation.
+    Create a new booking with database-level locking to prevent double-booking.
     
-    POST: Creates a new booking with validation and sends confirmation email asynchronously.
-    Rate limited to 10 requests per hour per user to prevent abuse.
-    
-    Uses database-level locking to prevent double-booking in high-concurrency scenarios.
+    POST: Creates booking atomically and sends confirmation email.
+    Rate limited to 10 requests/hour per user.
+    Uses SELECT FOR UPDATE to prevent concurrent double-booking.
     """
     queryset = Booking.objects.all()
     serializer_class = BookingCreateSerializer
@@ -451,32 +461,16 @@ class BookingCreateAPIView(generics.CreateAPIView):
     
     def create(self, request, *args, **kwargs):
         """
-        Enhanced create with availability checking and transactional safety.
+        Enhanced create with atomic reservation and error handling.
         """
         try:
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             
-            # Extract validated data
             validated_data = serializer.validated_data
             room_id = validated_data.get('room').id
             check_in_date = validated_data.get('check_in_date')
             check_out_date = validated_data.get('check_out_date')
-            
-            # Check room availability with database locking
-            if not RoomAvailabilityService.is_room_available(room_id, check_in_date, check_out_date):
-                return Response(
-                    {
-                        'success': False,
-                        'message': 'Room is not available for the selected dates',
-                        'error_code': 'ROOM_UNAVAILABLE',
-                        'requested_dates': {
-                            'check_in': check_in_date,
-                            'check_out': check_out_date
-                        }
-                    },
-                    status=status.HTTP_409_CONFLICT
-                )
             
             # Prepare guest data for reservation
             guest_data = {
@@ -498,8 +492,8 @@ class BookingCreateAPIView(generics.CreateAPIView):
                 'special_requests': validated_data.get('special_requests'),
             }
             
-            # Atomically reserve the room
-            success, booking, error = RoomAvailabilityService.reserve_room(
+            # Atomically reserve the room with database locking
+            success, booking, error = RoomReservationService.reserve_room(
                 room_id=room_id,
                 check_in_date=check_in_date,
                 check_out_date=check_out_date,
@@ -512,30 +506,59 @@ class BookingCreateAPIView(generics.CreateAPIView):
                     {
                         'success': False,
                         'message': error,
-                        'error_code': 'BOOKING_FAILED'
+                        'error_code': 'ROOM_UNAVAILABLE'
                     },
                     status=status.HTTP_409_CONFLICT
                 )
             
-            # Send confirmation email asynchronously
-            send_confirmation_email_async.delay(booking.id)
+            # Send confirmation email and handle failures properly
+            email_sent, email_error = send_booking_confirmation_email(booking)
+            
+            # Queue async email if synchronous failed
+            if not email_sent:
+                logger.warning(f"Sync email failed for {booking.id}, queuing async task")
+                try:
+                    send_confirmation_email_async.delay(booking.id)
+                    email_queued = True
+                except Exception as e:
+                    logger.error(f"Failed to queue async email: {str(e)}")
+                    email_queued = False
+            else:
+                email_queued = False
             
             # Serialize booking response
             booking_serializer = BookingSerializer(booking)
             
-            return Response(
-                {
-                    'success': True,
-                    'message': 'Booking created successfully',
-                    'booking': booking_serializer.data,
-                    'email_confirmation': {
-                        'message': 'Confirmation email will be sent shortly',
-                        'recipient': booking.guest_email,
-                        'async': True
+            response_data = {
+                'success': True,
+                'message': 'Booking created successfully',
+                'booking': booking_serializer.data,
+            }
+            
+            # Add email status
+            if email_sent or email_queued:
+                response_data['email_confirmation'] = {
+                    'status': 'sent' if email_sent else 'queued',
+                    'recipient': booking.guest_email,
+                    'message': 'Confirmation email sent' if email_sent else 'Confirmation email queued for delivery'
+                }
+            else:
+                # Email failed - IMPORTANT: Notify user!
+                response_data['warnings'] = [
+                    {
+                        'type': 'email_failure',
+                        'message': f'Booking created successfully, but confirmation email could not be sent. Error: {email_error}',
+                        'booking_reference': booking.booking_id,
+                        'action_required': 'Please contact support if you do not receive confirmation email within 2 hours'
                     }
-                },
-                status=status.HTTP_201_CREATED
-            )
+                ]
+                response_data['email_confirmation'] = {
+                    'status': 'failed',
+                    'recipient': booking.guest_email,
+                    'error': email_error
+                }
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
         
         except ValidationError as e:
             return Response(
@@ -840,5 +863,200 @@ class RoomBookingListAPIView(generics.ListAPIView):
         except Room.DoesNotExist:
             return Response(
                 {'error': 'Room not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+# NEW ENDPOINT: Confirm Booking (pending → confirmed)
+class BookingConfirmationAPIView(generics.GenericAPIView):
+    """
+    Confirm a pending booking.
+    
+    POST: Moves booking from pending to confirmed status
+    Typically called by admin/staff after verifying payment
+    """
+    queryset = Booking.objects.all()
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
+    
+    def post(self, request, *args, **kwargs):
+        """Confirm a pending booking"""
+        try:
+            booking = self.get_object()
+            
+            if booking.status != 'pending':
+                return Response(
+                    {
+                        'success': False,
+                        'message': f'Booking is {booking.get_status_display()}, not pending',
+                        'current_status': booking.status
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Confirm using service
+            success, error = BookingConfirmationService.confirm_booking(
+                booking=booking,
+                confirmed_by=request.user
+            )
+            
+            if not success:
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'Failed to confirm booking',
+                        'error': error
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get updated booking
+            booking.refresh_from_db()
+            serializer = BookingSerializer(booking)
+            
+            return Response(
+                {
+                    'success': True,
+                    'message': 'Booking confirmed successfully',
+                    'booking': serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        except Booking.DoesNotExist:
+            return Response(
+                {'error': 'Booking not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error confirming booking: {str(e)}")
+            return Response(
+                {
+                    'success': False,
+                    'message': 'Error confirming booking',
+                    'error': str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+# NEW ENDPOINT: Cancel Booking with Refund
+class BookingCancellationAPIView(generics.GenericAPIView):
+    """
+    Cancel a booking with automatic refund calculation based on policy.
+    
+    POST: Cancels booking and calculates refund based on hotel's refund policy
+    """
+    queryset = Booking.objects.all()
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
+    
+    def post(self, request, *args, **kwargs):
+        """Cancel booking and calculate refund"""
+        try:
+            booking = self.get_object()
+            cancel_reason = request.data.get('reason', 'Guest requested cancellation')
+            
+            # Cancel using service with refund calculation
+            result = BookingCancellationService.cancel_booking(
+                booking=booking,
+                cancel_reason=cancel_reason,
+                cancelled_by=request.user if request.user.is_authenticated else None
+            )
+            
+            if not result['success']:
+                return Response(
+                    {
+                        'success': False,
+                        'message': result['message'],
+                        'error': result['error']
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Send cancellation email
+            email_sent, email_error = send_booking_cancellation_email(booking)
+            if not email_sent:
+                try:
+                    send_cancellation_email_async.delay(booking.id)
+                    email_queued = True
+                except:
+                    email_queued = False
+            else:
+                email_queued = False
+            
+            # Get updated booking
+            booking.refresh_from_db()
+            serializer = BookingSerializer(booking)
+            
+            response_data = {
+                'success': True,
+                'message': 'Booking cancelled successfully',
+                'booking': serializer.data,
+                'refund': result['refund'],
+                'email_confirmation': {
+                    'status': 'sent' if email_sent else ('queued' if email_queued else 'failed'),
+                    'message': 'Cancellation confirmation email sent' if email_sent else 'Cancellation confirmation email queued' if email_queued else 'Failed to send email'
+                }
+            }
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+        
+        except Booking.DoesNotExist:
+            return Response(
+                {'error': 'Booking not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error cancelling booking: {str(e)}", exc_info=True)
+            return Response(
+                {
+                    'success': False,
+                    'message': 'Error cancelling booking',
+                    'error': str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+# NEW ENDPOINT: Booking Audit History
+class BookingAuditHistoryAPIView(generics.ListAPIView):
+    """
+    Get complete audit trail for a booking.
+    
+    GET: Returns all changes to booking with timestamps and user info
+    Useful for compliance, dispute resolution, and operational transparency
+    """
+    serializer_class = BookingAuditLogSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = BookingPagination
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['changed_at', 'change_type']
+    ordering = ['-changed_at']
+    
+    def get_queryset(self):
+        """Get audit logs for specific booking"""
+        booking_id = self.kwargs['pk']
+        return BookingAuditLog.objects.filter(
+            booking_id=booking_id
+        ).select_related('changed_by', 'booking').order_by('-changed_at')
+    
+    def list(self, request, *args, **kwargs):
+        """Return booking audit history"""
+        try:
+            # Verify booking exists
+            booking = Booking.objects.get(id=self.kwargs['pk'])
+            
+            response = super().list(request, *args, **kwargs)
+            response.data = {
+                'booking_id': booking.id,
+                'booking_reference': booking.booking_id,
+                'guest_name': booking.guest_full_name(),
+                'audit_log': response.data
+            }
+            return response
+        except Booking.DoesNotExist:
+            return Response(
+                {'error': 'Booking not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
