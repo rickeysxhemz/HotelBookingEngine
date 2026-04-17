@@ -935,6 +935,29 @@ For issues and questions:
 
 ---
 
-## 📄 License
-
-Proprietary - Mar Hotels
+Client Request Flow:
+┌──────────────┐
+│   Client     │
+│  HTTP/HTTPS  │
+└──────┬───────┘
+       │
+       ↓
+┌──────────────────────────────────────┐
+│      NGINX (Port 80/443)             │
+│  - SSL/TLS Termination               │
+│  - Reverse Proxy                     │
+│  - Serve Static Files                │
+└──────┬───────────────────────────────┘
+       │ (internal docker network)
+       │ proxy_pass http://web:8000
+       ↓
+┌──────────────────────────────────────┐
+│  Django/Gunicorn (Port 8000)         │
+│  - Run application                   │
+│  - Handle requests                   │
+│  - Queue Celery tasks                │
+└──────┬────────────┬──────────┬───────┘
+       │            │          │
+  ┌────↓──┐   ┌─────↓─┐   ┌──↓──────┐
+  │  DB   │   │ Redis │   │ Celery  │
+  └───────┘   └───────┘   └─────────┘

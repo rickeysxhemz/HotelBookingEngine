@@ -1,8 +1,6 @@
 # Dockerfile for Django API (HotelBookingEngine)
 FROM python:3.12-slim
 
-# Use faster Debian mirror
-RUN sed -i 's|deb.debian.org|mirror.example.com|g' /etc/apt/sources.list
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
