@@ -99,6 +99,9 @@
           {% sidebar_link 'manager:offer_categories' 'fa-solid fa-tags' 'Categories' %}
           {% sidebar_link 'manager:offer_highlights_all' 'fa-solid fa-star' 'Offer Highlights' %}
           {% sidebar_link 'manager:offer_images_all' 'fa-solid fa-image' 'Offer Images' %}
+
+          <div class="sidebar-heading-divider">Payments</div>
+          {% sidebar_link 'manager:payments' 'fa-solid fa-credit-card' 'Payments' %}
         </div>
       </div>
       <!-- /#sidebar-wrapper -->
@@ -158,9 +161,42 @@
               <div class="me-3 text-muted small">
                 Signed in as <strong>{{ request.user.get_username }}</strong>
               </div>
-              <a class="btn btn-outline-secondary btn-sm" href="{% url 'manager:logout' %}">
-                <i class="fa-solid fa-right-from-bracket me-1"></i>Logout
-              </a>
+              
+              <!-- Profile Dropdown Menu -->
+              <div class="dropdown">
+                <button
+                  class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                  type="button"
+                  id="profileDropdown"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  <i class="fa-solid fa-user-circle me-1"></i>Profile
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
+                  <li>
+                    <a class="dropdown-item" href="{% url 'manager:profile' %}">
+                      <i class="fa-solid fa-user me-2"></i>View Profile
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item" href="{% url 'manager:profile_edit' %}">
+                      <i class="fa-solid fa-pen me-2"></i>Edit Profile
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item" href="{% url 'manager:change_password' %}">
+                      <i class="fa-solid fa-key me-2"></i>Change Password
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider" /></li>
+                  <li>
+                    <a class="dropdown-item text-danger" href="{% url 'manager:logout' %}">
+                      <i class="fa-solid fa-right-from-bracket me-2"></i>Logout
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </nav>

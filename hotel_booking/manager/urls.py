@@ -8,7 +8,12 @@ urlpatterns = [
     path('login/', views_cbv.ManagerLoginView.as_view(), name='login'),
     path('logout/', views_cbv.manager_logout, name='logout'),
     path('', views_cbv.DashboardView.as_view(), name='dashboard'),
-    # Hotels
+    
+    # Profile Management
+    path('profile/', views_cbv.ProfileView.as_view(), name='profile'),
+    path('profile/edit/', views_cbv.ProfileEditView.as_view(), name='profile_edit'),
+    path('profile/change-password/', views_cbv.ChangePasswordView.as_view(), name='change_password'),
+    
     path('hotels/', views_cbv.HotelListView.as_view(), name='hotels'),
     path('hotels/add/', views_cbv.HotelCreateView.as_view(), name='hotel_add'),
     
@@ -128,4 +133,10 @@ urlpatterns = [
     
     # 7. Manager Roles and Property Scoping
     path('managers/<uuid:user_id>/properties/', views_cbv.ManagerPropertyAssignmentView.as_view(), name='manager_properties'),
+    
+    # 8. Payments Management
+    path('payments/', views_cbv.PaymentListView.as_view(), name='payments'),
+    path('payments/add/', views_cbv.PaymentCreateView.as_view(), name='payment_add'),
+    path('payments/<int:pk>/edit/', views_cbv.PaymentUpdateView.as_view(), name='payment_edit'),
+    path('payments/<int:pk>/delete/', views_cbv.PaymentDeleteView.as_view(), name='payment_delete'),
 ]

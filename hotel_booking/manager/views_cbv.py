@@ -22,11 +22,12 @@ from core.models import (Extra, Hotel, Room, RoomAmenity, RoomImage, RoomType,
                        RoomTypeAmenity, SeasonalPricing)
 from offers.models import Offer, OfferCategory, OfferHighlight, OfferImage
 from accounts.models import CustomUser
+from payments.models import Payment
 
 from .forms import (BookingForm, ExtraForm, HotelForm, RoomAmenityForm,
                     RoomForm, RoomImageForm, RoomTypeAmenityForm,
                     RoomTypeForm, SeasonalPricingForm, OfferForm, OfferCategoryForm,
-                    OfferHighlightForm, OfferImageForm, BulkBookingStatusForm, RefundPolicyForm)
+                    OfferHighlightForm, OfferImageForm, BulkBookingStatusForm, RefundPolicyForm, PaymentForm)
 
 
 class ManagerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -162,6 +163,14 @@ class DashboardView(ManagerRequiredMixin, View):
         offer_highlights_count = OfferHighlight.objects.count()
         offer_images_count = OfferImage.objects.count()
 
+        # Payments related
+        total_payments = Payment.objects.count()
+        completed_payments = Payment.objects.filter(status='completed').count()
+        pending_payments = Payment.objects.filter(status='pending').count()
+        failed_payments = Payment.objects.filter(status='failed').count()
+        total_revenue = Payment.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
+        recent_payments = Payment.objects.select_related('booking').order_by('-created_at')[:10]
+
         # Bookings related
         # Note: Old complex booking models simplified to single Booking model
         # bookingextras_count = BookingExtra.objects.count()
@@ -239,6 +248,12 @@ class DashboardView(ManagerRequiredMixin, View):
                 'change': user.has_perm('offers.change_offerimage'),
                 'delete': user.has_perm('offers.delete_offerimage'),
             },
+            'payment': {
+                'add': user.has_perm('payments.add_payment'),
+                'view': user.has_perm('payments.view_payment'),
+                'change': user.has_perm('payments.change_payment'),
+                'delete': user.has_perm('payments.delete_payment'),
+            },
         }
 
         context = {
@@ -261,6 +276,12 @@ class DashboardView(ManagerRequiredMixin, View):
             'offer_categories_count': offer_categories_count,
             'offer_highlights_count': offer_highlights_count,
             'offer_images_count': offer_images_count,
+            'total_payments': total_payments,
+            'completed_payments': completed_payments,
+            'pending_payments': pending_payments,
+            'failed_payments': failed_payments,
+            'total_revenue': total_revenue,
+            'recent_payments': recent_payments,
             # Old booking related counts removed - using simplified booking model
             # 'bookingextras_count': bookingextras_count,
             # 'bookingguests_count': bookingguests_count,
@@ -1995,3 +2016,185 @@ class ManagerPropertyFilterMixin:
                 qs = qs.filter(hotel_id__in=assigned_hotel_ids)
         
         return qs
+
+
+# ============================================================================
+# PAYMENTS MANAGEMENT
+# ============================================================================
+
+class PaymentListView(BulkActionMixin, BaseListView):
+    """List all payments with filtering and search"""
+    model = Payment
+    template_name = 'manager/list.html'
+    context_object_name = 'objects'
+    permission_required = 'payments.view_payment'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('booking__hotel', 'booking__room').order_by('-created_at')
+        
+        # Filter by status
+        status = self.request.GET.get('status')
+        if status:
+            qs = qs.filter(status=status)
+        
+        # Filter by method
+        method = self.request.GET.get('method')
+        if method:
+            qs = qs.filter(method=method)
+        
+        # Filter by date range
+        date_from = self.request.GET.get('date_from')
+        date_to = self.request.GET.get('date_to')
+        if date_from:
+            qs = qs.filter(created_at__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__lte=date_to)
+        
+        return qs
+    
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['model_name'] = 'payment'
+        ctx['add_url_name'] = 'manager:payment_add'
+        ctx['detail_url_name'] = None
+        ctx['model_verbose_name'] = 'Payment'
+        ctx['model_verbose_name_plural'] = 'Payments'
+        
+        # Add filter options
+        ctx['status_choices'] = Payment.PAYMENT_STATUS_CHOICES
+        ctx['method_choices'] = Payment.PAYMENT_METHOD_CHOICES
+        ctx['current_status'] = self.request.GET.get('status', '')
+        ctx['current_method'] = self.request.GET.get('method', '')
+        ctx['date_from'] = self.request.GET.get('date_from', '')
+        ctx['date_to'] = self.request.GET.get('date_to', '')
+        
+        return ctx
+
+
+class PaymentCreateView(BaseCreateView):
+    """Create a new payment"""
+    model = Payment
+    form_class = PaymentForm
+    template_name = 'manager/form.html'
+    success_url = reverse_lazy('manager:payments')
+    permission_required = 'payments.add_payment'
+    
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['model_name'] = 'payment'
+        ctx['model_verbose_name'] = 'Payment'
+        ctx['page_title'] = 'Add Payment'
+        return ctx
+
+
+class PaymentUpdateView(BaseUpdateView):
+    """Update an existing payment"""
+    model = Payment
+    form_class = PaymentForm
+    template_name = 'manager/form.html'
+    success_url = reverse_lazy('manager:payments')
+    permission_required = 'payments.change_payment'
+    
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['model_name'] = 'payment'
+        ctx['model_verbose_name'] = 'Payment'
+        ctx['page_title'] = 'Edit Payment'
+        return ctx
+
+
+class PaymentDeleteView(BaseDeleteView):
+    """Delete a payment"""
+    model = Payment
+    template_name = 'manager/confirm_delete.html'
+    success_url = reverse_lazy('manager:payments')
+    permission_required = 'payments.delete_payment'
+
+
+# PROFILE MANAGEMENT VIEWS
+class ProfileView(ManagerRequiredMixin, View):
+    """Display manager profile information"""
+    
+    def get(self, request):
+        context = {
+            'user': request.user,
+            'page_title': 'My Profile'
+        }
+        return render(request, 'manager/profile.html', context)
+
+
+class ProfileEditView(ManagerRequiredMixin, View):
+    """Edit manager profile information (username, email, name)"""
+    
+    def get(self, request):
+        from .forms import ProfileUpdateForm
+        form = ProfileUpdateForm(instance=request.user)
+        context = {
+            'form': form,
+            'page_title': 'Edit Profile'
+        }
+        return render(request, 'manager/profile_edit.html', context)
+    
+    def post(self, request):
+        from .forms import ProfileUpdateForm
+        form = ProfileUpdateForm(request.POST, instance=request.user)
+        
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Your profile has been updated successfully!')
+            return redirect('manager:profile')
+        
+        context = {
+            'form': form,
+            'page_title': 'Edit Profile'
+        }
+        return render(request, 'manager/profile_edit.html', context)
+
+
+class ChangePasswordView(ManagerRequiredMixin, View):
+    """Allow manager to change password"""
+    
+    def get(self, request):
+        from .forms import ChangePasswordForm
+        form = ChangePasswordForm()
+        context = {
+            'form': form,
+            'page_title': 'Change Password'
+        }
+        return render(request, 'manager/change_password.html', context)
+    
+    def post(self, request):
+        from .forms import ChangePasswordForm
+        from django.contrib.auth import authenticate
+        
+        form = ChangePasswordForm(request.POST)
+        
+        if form.is_valid():
+            # Verify current password
+            current_password = form.cleaned_data.get('current_password')
+            if not request.user.check_password(current_password):
+                messages.error(request, 'Your current password is incorrect.')
+                context = {
+                    'form': form,
+                    'page_title': 'Change Password'
+                }
+                return render(request, 'manager/change_password.html', context)
+            
+            # Set new password
+            new_password = form.cleaned_data.get('new_password')
+            request.user.set_password(new_password)
+            request.user.save()
+            
+            # Re-authenticate the user to keep them logged in
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, request.user)
+            
+            messages.success(request, 'Your password has been changed successfully!')
+            return redirect('manager:profile')
+        
+        context = {
+            'form': form,
+            'page_title': 'Change Password'
+        }
+        return render(request, 'manager/change_password.html', context)

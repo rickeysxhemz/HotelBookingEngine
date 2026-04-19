@@ -3,6 +3,8 @@ from core.models import Hotel, Room, RoomType, Extra, SeasonalPricing, RoomAmeni
 from bookings.models import Booking, RefundPolicy
 from core.models import RoomAmenity, RoomImage, RoomTypeAmenity, SeasonalPricing
 from offers.models import Offer, OfferCategory, OfferHighlight, OfferImage
+from payments.models import Payment
+from accounts.models import CustomUser
 
 
 class BaseForm(forms.ModelForm):
@@ -570,3 +572,153 @@ class RefundPolicyForm(BaseForm):
             }),
             'policy_description': forms.Textarea(attrs={'rows': 4}),
         }
+
+
+class PaymentForm(BaseForm):
+    """Form for creating and managing payments"""
+    placeholder_mapping = {
+        'amount': 'e.g., 250.00',
+        'currency': 'e.g., SAR',
+        'transaction_id': 'Transaction ID from payment gateway (if available)',
+        'idempotency_key': 'Unique request key for idempotency',
+    }
+    
+    class Meta:
+        model = Payment
+        fields = ['booking', 'amount', 'currency', 'method', 'status', 'transaction_id', 'idempotency_key']
+        widgets = {
+            'booking': forms.Select(attrs={'class': 'form-select'}),
+            'amount': forms.NumberInput(attrs={'step': '0.01', 'min': '0'}),
+            'currency': forms.TextInput(attrs={'maxlength': '3'}),
+            'method': forms.Select(attrs={'class': 'form-select'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'transaction_id': forms.TextInput(attrs={'maxlength': '100'}),
+            'idempotency_key': forms.TextInput(attrs={'maxlength': '100'}),
+        }
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        booking = cleaned_data.get('booking')
+        amount = cleaned_data.get('amount')
+        
+        # Validate that amount is positive
+        if amount and amount <= 0:
+            raise forms.ValidationError('Payment amount must be greater than zero.')
+        
+        # Validate currency code
+        currency = cleaned_data.get('currency', 'SAR').upper()
+        if len(currency) != 3:
+            raise forms.ValidationError('Currency code must be exactly 3 characters (e.g., SAR, USD).')
+        cleaned_data['currency'] = currency
+        
+        return cleaned_data
+
+
+class ProfileUpdateForm(forms.ModelForm):
+    """Form for updating manager profile information"""
+    
+    email = forms.EmailField(
+        label='Email Address',
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'your.email@example.com'
+        })
+    )
+    
+    username = forms.CharField(
+        label='Username',
+        max_length=150,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your login username'
+        })
+    )
+    
+    first_name = forms.CharField(
+        label='First Name',
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your first name'
+        })
+    )
+    
+    last_name = forms.CharField(
+        label='Last Name',
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your last name'
+        })
+    )
+    
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'email', 'first_name', 'last_name']
+    
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        # Check if username is already taken by another user
+        from accounts.models import CustomUser
+        if CustomUser.objects.filter(username=username).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('This username is already taken. Please choose a different one.')
+        return username
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        # Check if email is already taken by another user
+        from accounts.models import CustomUser
+        if CustomUser.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('This email address is already in use. Please use a different one.')
+        return email
+
+
+class ChangePasswordForm(forms.Form):
+    """Form for changing password"""
+    
+    current_password = forms.CharField(
+        label='Current Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your current password',
+            'autocomplete': 'current-password'
+        })
+    )
+    
+    new_password = forms.CharField(
+        label='New Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your new password',
+            'autocomplete': 'new-password'
+        }),
+        help_text='Password must be at least 8 characters long.'
+    )
+    
+    confirm_password = forms.CharField(
+        label='Confirm New Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Re-enter your new password',
+            'autocomplete': 'new-password'
+        })
+    )
+    
+    def clean_new_password(self):
+        new_password = self.cleaned_data.get('new_password')
+        if new_password and len(new_password) < 8:
+            raise forms.ValidationError('Password must be at least 8 characters long.')
+        return new_password
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        new_password = cleaned_data.get('new_password')
+        confirm_password = cleaned_data.get('confirm_password')
+        
+        if new_password and confirm_password:
+            if new_password != confirm_password:
+                raise forms.ValidationError('The new passwords do not match. Please try again.')
+        
+        return cleaned_data

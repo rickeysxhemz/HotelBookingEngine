@@ -171,9 +171,129 @@
                 {# {% if perms.offerimage.add %}<a href="{% url 'manager:offer_image_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %} #}
               </td>
             </tr>
+            <tr>
+              <td>Payments</td>
+              <td>{{ total_payments }}</td>
+              <td>
+                {% if perms.payment.view %}<a href="{% url 'manager:payments' %}" class="btn btn-link btn-sm">View</a>{% endif %}
+                {% if perms.payment.add %}<a href="{% url 'manager:payment_add' %}" class="btn btn-link btn-sm">Add</a>{% endif %}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <!-- Payments Management Section (Full Width) -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">💳 Payments Management</h5>
+        <div>
+          {% if perms.payment.add %}<a href="{% url 'manager:payment_add' %}" class="btn btn-sm btn-success">+ Add Payment</a>{% endif %}
+          {% if perms.payment.view %}<a href="{% url 'manager:payments' %}" class="btn btn-sm btn-primary">View All</a>{% endif %}
+        </div>
+      </div>
+      
+      <!-- Payment Quick Stats Row -->
+      <div class="card-body border-bottom">
+        <div class="row g-3">
+          <div class="col-6 col-md-3">
+            <div class="text-center">
+              <div class="text-muted small mb-1">Total Revenue</div>
+              <div class="fs-5 fw-bold text-success">{{ total_revenue|floatformat:2 }} SAR</div>
+              <small class="text-muted">All completed</small>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="text-center">
+              <div class="text-muted small mb-1">Completed</div>
+              <div class="fs-5 fw-bold text-success">{{ completed_payments }}</div>
+              <small class="text-muted">Paid bookings</small>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="text-center">
+              <div class="text-muted small mb-1">Pending</div>
+              <div class="fs-5 fw-bold text-warning">{{ pending_payments }}</div>
+              <small class="text-muted">Awaiting payment</small>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="text-center">
+              <div class="text-muted small mb-1">Failed</div>
+              <div class="fs-5 fw-bold text-danger">{{ failed_payments }}</div>
+              <small class="text-muted">Issue occurred</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Payments Table -->
+      {% if recent_payments %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Booking ID</th>
+                <th>Guest</th>
+                <th>Amount</th>
+                <th>Method</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for payment in recent_payments %}
+                <tr>
+                  <td>
+                    <strong>{{ payment.booking.booking_id }}</strong>
+                  </td>
+                  <td>
+                    <small>{{ payment.booking.guest_first_name }} {{ payment.booking.guest_last_name }}</small>
+                  </td>
+                  <td>
+                    <strong>{{ payment.amount|floatformat:2 }}</strong><br>
+                    <small class="text-muted">{{ payment.currency }}</small>
+                  </td>
+                  <td>
+                    <span class="badge bg-light text-dark">{{ payment.get_method_display }}</span>
+                  </td>
+                  <td>
+                    <span class="badge bg-{% if payment.status == 'completed' %}success{% elif payment.status == 'pending' %}warning{% elif payment.status == 'failed' %}danger{% else %}secondary{% endif %}">
+                      {{ payment.get_status_display }}
+                    </span>
+                  </td>
+                  <td>
+                    <small>{{ payment.created_at|date:"d M Y H:i" }}</small>
+                  </td>
+                  <td>
+                    <div class="btn-group btn-group-sm" role="group">
+                      {% if perms.payment.change %}
+                        <a href="{% url 'manager:payment_edit' payment.pk %}" class="btn btn-outline-primary" title="Edit">✏️</a>
+                      {% endif %}
+                      {% if perms.payment.delete %}
+                        <a href="{% url 'manager:payment_delete' payment.pk %}" class="btn btn-outline-danger" title="Delete">🗑️</a>
+                      {% endif %}
+                      <a href="{% url 'manager:booking_detail' payment.booking.pk %}" class="btn btn-outline-info" title="View Booking">📋</a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-footer">
+          <small class="text-muted">Showing {{ recent_payments|length }} recent payments</small>
+        </div>
+      {% else %}
+        <div class="card-body text-center text-muted">
+          <p class="mb-0">No payments recorded yet</p>
+          {% if perms.payment.add %}<a href="{% url 'manager:payment_add' %}" class="btn btn-sm btn-primary mt-2">Add First Payment</a>{% endif %}
+        </div>
+      {% endif %}
     </div>
   </div>
 </div>

@@ -1,0 +1,113 @@
+{% extends 'manager/base.html' %}
+{% load static %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Profile Card -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-user-circle me-2"></i>Profile Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">First Name</label>
+                            <p class="fs-6">
+                                {% if user.first_name %}
+                                    {{ user.first_name }}
+                                {% else %}
+                                    <span class="text-muted">Not set</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Last Name</label>
+                            <p class="fs-6">
+                                {% if user.last_name %}
+                                    {{ user.last_name }}
+                                {% else %}
+                                    <span class="text-muted">Not set</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Username</label>
+                            <p class="fs-6">{{ user.username }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Email Address</label>
+                            <p class="fs-6">{{ user.email }}</p>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Account Status</label>
+                            <p class="fs-6">
+                                {% if user.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Account Type</label>
+                            <p class="fs-6">
+                                {% if user.user_type == 'staff' %}
+                                    <span class="badge bg-info">Manager</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ user.user_type|upper }}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Member Since</label>
+                            <p class="fs-6">{{ user.date_joined|date:"F j, Y" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Last Login</label>
+                            <p class="fs-6">
+                                {% if user.last_login %}
+                                    {{ user.last_login|date:"F j, Y H:i" }}
+                                {% else %}
+                                    <span class="text-muted">Never</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'manager:profile_edit' %}" class="btn btn-primary">
+                            <i class="fa-solid fa-pen me-2"></i>Edit Profile
+                        </a>
+                        <a href="{% url 'manager:change_password' %}" class="btn btn-warning">
+                            <i class="fa-solid fa-key me-2"></i>Change Password
+                        </a>
+                        <a href="{% url 'manager:dashboard' %}" class="btn btn-secondary">
+                            <i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
