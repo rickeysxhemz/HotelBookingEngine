@@ -71,17 +71,33 @@ TEMPLATES = [
     },
 ]
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='hotelMaarDB'),
-        'USER': config('DB_USER', default='hotelapi_user'),
-        'PASSWORD': config('DB_PASSWORD', default='hotelapi_secure_password'),
-        'HOST': config('DB_HOST', default='db'),
-        'PORT': config('DB_PORT', default='5432', cast=int),
-        'CONN_MAX_AGE': 600,
+DATABASE_URL = config('DATABASE_URL', default='')
+if DATABASE_URL:
+    from urllib.parse import urlparse
+    _parsed = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _parsed.path.lstrip('/') or 'postgres',
+            'USER': _parsed.username or '',
+            'PASSWORD': _parsed.password or '',
+            'HOST': _parsed.hostname or '',
+            'PORT': _parsed.port or 5432,
+            'CONN_MAX_AGE': 600,
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='hotelMaarDB'),
+            'USER': config('DB_USER', default='hotelapi_user'),
+            'PASSWORD': config('DB_PASSWORD', default='hotelapi_secure_password'),
+            'HOST': config('DB_HOST', default='db'),
+            'PORT': config('DB_PORT', default='5432', cast=int),
+            'CONN_MAX_AGE': 600,
+        }
+    }
 
 # Redis and Caching configuration for production
 CACHES = {
