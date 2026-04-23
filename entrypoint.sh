@@ -5,25 +5,8 @@ cd /app/hotel_booking
 
 DB_HOST_VAL="${DB_HOST:-db}"
 DB_PORT_VAL="${DB_PORT:-5432}"
-
-# DB_USER, DB_PASSWORD, and DB_NAME must be supplied by the environment
-# (e.g. Railway reference variables). No hardcoded defaults so that the
-# real service credentials are never silently overridden.
-if [ -z "${DB_USER}" ]; then
-  echo "ERROR: DB_USER is not set. Set it to the Postgres username (e.g. via Railway reference variable DB_USER=\${{ Postgres.PGUSER }})." >&2
-  exit 1
-fi
-if [ -z "${DB_PASSWORD}" ]; then
-  echo "ERROR: DB_PASSWORD is not set. Set it to the Postgres password (e.g. via Railway reference variable DB_PASSWORD=\${{ Postgres.PGPASSWORD }})." >&2
-  exit 1
-fi
-if [ -z "${DB_NAME}" ]; then
-  echo "ERROR: DB_NAME is not set. Set it to the Postgres database name (e.g. via Railway reference variable DB_NAME=\${{ Postgres.PGDATABASE }})." >&2
-  exit 1
-fi
-
-DB_USER_VAL="${DB_USER}"
-DB_NAME_VAL="${DB_NAME}"
+DB_USER_VAL="${DB_USER:-hotelapi_user}"
+DB_NAME_VAL="${DB_NAME:-hotelMaarDB}"
 
 wait_for_db() {
   echo "Waiting for database at ${DB_HOST_VAL}:${DB_PORT_VAL}..."
