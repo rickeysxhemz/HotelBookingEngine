@@ -3,10 +3,26 @@ set -e
 
 cd /app/hotel_booking
 
-DB_HOST_VAL="${DB_HOST:-db}"
-DB_PORT_VAL="${DB_PORT:-5432}"
-DB_USER_VAL="${DB_USER:-hotelapi_user}"
-DB_NAME_VAL="${DB_NAME:-hotelMaarDB}"
+echo "=== env diagnostic ==="
+echo "DATABASE_URL present: $([ -n "${DATABASE_URL:-}" ] && echo YES || echo NO)"
+echo "DB_HOST: ${DB_HOST:-<unset>}"
+echo "SECRET_KEY present: $([ -n "${SECRET_KEY:-}" ] && echo YES || echo NO)"
+echo "ALLOWED_HOSTS: ${ALLOWED_HOSTS:-<unset>}"
+echo "PORT: ${PORT:-<unset>}"
+echo "====================="
+
+# Prefer DATABASE_URL (Railway/Render), fall back to individual DB_* vars (compose).
+if [ -n "${DATABASE_URL:-}" ]; then
+  DB_HOST_VAL=$(python -c "from urllib.parse import urlparse; import os; print(urlparse(os.environ['DATABASE_URL']).hostname or '')")
+  DB_PORT_VAL=$(python -c "from urllib.parse import urlparse; import os; print(urlparse(os.environ['DATABASE_URL']).port or 5432)")
+  DB_USER_VAL=$(python -c "from urllib.parse import urlparse; import os; print(urlparse(os.environ['DATABASE_URL']).username or '')")
+  DB_NAME_VAL=$(python -c "from urllib.parse import urlparse; import os; print((urlparse(os.environ['DATABASE_URL']).path or '').lstrip('/') or 'postgres')")
+else
+  DB_HOST_VAL="${DB_HOST:-db}"
+  DB_PORT_VAL="${DB_PORT:-5432}"
+  DB_USER_VAL="${DB_USER:-hotelapi_user}"
+  DB_NAME_VAL="${DB_NAME:-hotelMaarDB}"
+fi
 
 wait_for_db() {
   echo "Waiting for database at ${DB_HOST_VAL}:${DB_PORT_VAL}..."
