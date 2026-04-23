@@ -3,17 +3,21 @@ set -e
 
 cd /app/hotel_booking
 
+DB_HOST_VAL="${DB_HOST:-db}"
+DB_PORT_VAL="${DB_PORT:-5432}"
+DB_USER_VAL="${DB_USER:-hotelapi_user}"
+DB_NAME_VAL="${DB_NAME:-hotelMaarDB}"
+
 wait_for_db() {
-  echo "Waiting for database..."
+  echo "Waiting for database at ${DB_HOST_VAL}:${DB_PORT_VAL}..."
   for i in {1..60}; do
-    if python -c "import psycopg2,os; psycopg2.connect(host=os.environ.get('DB_HOST','db'),port=os.environ.get('DB_PORT','5432'),user=os.environ.get('DB_USER','hotelapi_user'),password=os.environ.get('DB_PASSWORD',''),dbname=os.environ.get('DB_NAME','hotelMaarDB')).close()" 2>/dev/null; then
+    if pg_isready -h "$DB_HOST_VAL" -p "$DB_PORT_VAL" -U "$DB_USER_VAL" -d "$DB_NAME_VAL" 2>/dev/null; then
       echo "Database available"
       return 0
     fi
     sleep 1
   done
-  echo "Database did not become available in time" >&2
-  return 1
+  echo "Database did not become ready in time — continuing anyway" >&2
 }
 
 create_superuser_if_missing() {
@@ -39,7 +43,7 @@ else:
 PY
 }
 
-# Skip setup on celery worker / beat services so only the web service migrates.
+# Skip heavy setup on non-web services (celery worker/beat should set RUN_SETUP=false).
 if [ "${RUN_SETUP:-true}" = "true" ]; then
   wait_for_db
   echo "Running migrations..."
@@ -50,12 +54,12 @@ if [ "${RUN_SETUP:-true}" = "true" ]; then
   create_superuser_if_missing
 fi
 
-# If a command is provided (e.g. celery, custom gunicorn), run it.
-# Otherwise start gunicorn on $PORT (Railway/Render) or 8000 (compose).
+# If a start command is provided (celery worker, beat, custom), exec it.
 if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
+# Default: web service — bind to $PORT (Railway/Render) with 8000 fallback for local compose.
 exec gunicorn hotel_booking.wsgi:application \
   --bind "0.0.0.0:${PORT:-${APP_PORT:-8000}}" \
   --workers "${GUNICORN_WORKERS:-2}" \
