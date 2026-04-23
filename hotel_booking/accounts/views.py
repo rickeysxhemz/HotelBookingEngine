@@ -12,6 +12,7 @@ from django.core.files.base import ContentFile
 
 # Third-party imports
 from rest_framework import generics, status, permissions
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -42,17 +43,19 @@ class RegisterAPIView(generics.CreateAPIView):
         with transaction.atomic():
             user = serializer.save()
             user.is_active = True
+            if settings.DEBUG:
+                user.is_verified = True
             user.save()
-            
-            # User profile is automatically created by signal
-            
-            # Send verification email if needed
+
             if not user.is_verified:
                 self.send_verification_email(user)
-        
+
+            token, _ = Token.objects.get_or_create(user=user)
+
         return Response({
-            'message': 'Registration successful! Please check your email to verify your account.',
-            'user': UserSerializer(user).data
+            'message': 'Registration successful!',
+            'token': token.key,
+            'user': UserSerializer(user).data,
         }, status=status.HTTP_201_CREATED)
     
     def send_verification_email(self, user):
@@ -121,22 +124,20 @@ def login_api_view(request):
     user.last_login_ip = get_client_ip(request)
     user.failed_login_attempts = 0
     user.save(update_fields=['last_login_ip', 'failed_login_attempts'])
-    
+
+    token, _ = Token.objects.get_or_create(user=user)
+
     return Response({
         'message': f'Welcome back, {user.get_short_name()}!',
-        'tokens': {
-            'access': '',
-            'refresh': '',
-        },
-        'user': UserSerializer(user).data
+        'token': token.key,
+        'user': UserSerializer(user).data,
     })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_api_view(request):
-    """Logout API endpoint"""
-    from django.contrib.auth import logout
-    logout(request)
+    """Logout API endpoint — deletes the user's token."""
+    Token.objects.filter(user=request.user).delete()
     return Response({'message': 'Successfully logged out.'}, status=status.HTTP_200_OK)
 
 

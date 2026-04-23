@@ -1386,9 +1386,10 @@ def hotel_search(request):
         # Get query parameters
         check_in = request.GET.get('check_in')
         check_out = request.GET.get('check_out')
-        capacity = request.GET.get('capacity')
+        capacity = request.GET.get('capacity') or request.GET.get('guests')
         hotel_id = request.GET.get('hotel_id')
-        
+        city = request.GET.get('city')
+
         # Validate required parameters
         if not check_in or not check_out:
             return Response({
@@ -1426,29 +1427,33 @@ def hotel_search(request):
         
         # Start with active hotels
         hotels_query = Hotel.objects.filter(is_active=True)
-        
+
         # Filter by specific hotel if provided
         if hotel_id:
             hotels_query = hotels_query.filter(id=hotel_id)
-        
+
+        # Filter by city if provided
+        if city:
+            hotels_query = hotels_query.filter(city__iexact=city)
+
         # Get available hotels
         available_hotels = []
-        
+
         for hotel in hotels_query:
             # Find room types that match capacity requirements
             room_types_query = RoomType.objects.filter(
                 rooms__hotel=hotel
             ).distinct()
-            
+
             # Filter by capacity if specified
             if capacity:
                 room_types_query = room_types_query.filter(
                     max_capacity__gte=capacity
                 )
-            
+
             # Check availability for each room type
             available_room_types = []
-            
+
             for room_type in room_types_query:
                 # Get rooms of this type in this hotel
                 hotel_rooms = Room.objects.filter(
@@ -1457,13 +1462,13 @@ def hotel_search(request):
                     is_active=True,
                     is_maintenance=False
                 )
-                
+
                 # Check for conflicting bookings
                 conflicting_bookings = Booking.objects.filter(
                     room__in=hotel_rooms,
                     status__in=['confirmed', 'checked_in'],
-                    check_in__lt=check_out_date,
-                    check_out__gt=check_in_date
+                    check_in_date__lt=check_out_date,
+                    check_out_date__gt=check_in_date,
                 )
                 
                 # Get booked room IDs

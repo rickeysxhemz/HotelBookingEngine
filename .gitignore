@@ -109,7 +109,6 @@ media/uploads/
 
 # ...existing code...
 
-# Ignore Django migration files
-**/migrations/
-**/migrations/*.py
-**/migrations/__init__.py
+# Django migrations MUST be committed — they're part of the schema history.
+# Only ignore their bytecode cache.
+**/migrations/__pycache__/

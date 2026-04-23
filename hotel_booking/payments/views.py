@@ -33,16 +33,23 @@ class InitiatePaymentView(generics.CreateAPIView):
             
             tap_service = TapPaymentService()
             success, payment, error = tap_service.create_payment(booking=booking, amount=amount, source_id=tap_source_id)
-            
+
             if not success:
                 return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
-            
-            booking.payment_status = 'paid'
-            booking.status = 'confirmed'
+
+            if payment.status == 'completed':
+                booking.payment_status = 'paid'
+                booking.status = 'confirmed'
+            else:
+                booking.payment_status = 'pending'
             booking.save()
-            
+
+            data = PaymentSerializer(payment).data
+            redirect_url = getattr(payment, 'redirect_url', None)
+            if redirect_url:
+                data['redirect_url'] = redirect_url
             logger.info(f"Payment initiated: {payment.id}")
-            return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+            return Response(data, status=status.HTTP_201_CREATED)
         except Booking.DoesNotExist:
             return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
         except TapPaymentException:

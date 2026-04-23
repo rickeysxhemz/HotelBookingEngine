@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders',
     'accounts',
     'bookings',
@@ -214,6 +215,7 @@ MESSAGE_TAGS = {
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -230,12 +232,19 @@ REST_FRAMEWORK = {
 
 # CORS configuration - MUST be overridden in production deployment.py
 # Development defaults only - DO NOT use in production
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-]
+_DEFAULT_CORS = (
+    "http://localhost:3000,"
+    "http://127.0.0.1:3000,"
+    "http://localhost:5173,"
+    "http://127.0.0.1:5173,"
+    "http://localhost:8080,"
+    "http://127.0.0.1:8080"
+)
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default=_DEFAULT_CORS,
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
+)
 
 # WARNING: This is for development only
 CORS_ALLOW_CREDENTIALS = True
@@ -330,4 +339,11 @@ SPECTACULAR_SETTINGS = {
     'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
     'SERVE_PUBLIC': True,
 }
+
+TAP_SECRET_KEY = config('TAP_SECRET_KEY', default='')
+TAP_API_KEY = config('TAP_API_KEY', default='')
+TAP_MERCHANT_ID = config('TAP_MERCHANT_ID', default='')
+TAP_WEBHOOK_SECRET = config('TAP_WEBHOOK_SECRET', default='')
+
+SITE_URL = config('SITE_URL', default='http://localhost:5173')
 
