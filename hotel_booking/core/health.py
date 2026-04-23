@@ -1,8 +1,12 @@
-from django.http import JsonResponse
 from django.db import connection
 from django.core.cache import cache
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 import time
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def health_check(request):
     """
     Health check endpoint for production monitoring
@@ -33,4 +37,4 @@ def health_check(request):
     # Return appropriate status code
     status_code = 200 if status["status"] == "healthy" else 503
     
-    return JsonResponse(status, status=status_code)
+    return Response(status, status=status_code)
