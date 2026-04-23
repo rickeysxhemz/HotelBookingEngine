@@ -60,12 +60,15 @@ class TapPaymentService:
                 'description': f"Booking {booking.booking_id} - {booking.hotel.name}",
                 'metadata': {'booking_id': booking.booking_id, 'hotel_id': str(booking.hotel.id)},
                 'receipt': {'email': True},
-                'redirect': {'url': getattr(settings, 'SITE_URL', 'https://hotelbooking.local') + f'/payments/{booking.id}/callback/'}
+                'redirect': {'url': getattr(settings, 'SITE_URL', 'http://localhost:5173') + f'/booking/{booking.id}?from=tap'},
             }
             if source_id:
                 payload['source'] = {'id': source_id}
             if save_card:
                 payload['save_card'] = True
+            merchant_id = getattr(settings, 'TAP_MERCHANT_ID', '')
+            if merchant_id:
+                payload['merchant'] = {'id': merchant_id}
             
             response = self.session.post(f'{self.BASE_URL}/charges', json=payload, timeout=30, headers={'Idempotency-Key': idempotency_key})
             response.raise_for_status()
@@ -74,22 +77,37 @@ class TapPaymentService:
             tap_id = data.get('id')
             tap_status = data.get('status')
             tap_success = tap_status in ['CHARGED', 'COMPLETED']
-            
+            tap_pending = tap_status in ['INITIATED', 'IN_PROGRESS', 'PENDING']
+
+            if tap_success:
+                payment_status = 'completed'
+            elif tap_pending:
+                payment_status = 'processing'
+            else:
+                payment_status = 'failed'
+
             payment, _ = Payment.objects.update_or_create(booking=booking, defaults={
                 'amount': amount, 'currency': currency, 'method': 'tap', 'transaction_id': tap_id,
-                'idempotency_key': idempotency_key, 'status': 'completed' if tap_success else 'failed'
+                'idempotency_key': idempotency_key, 'status': payment_status,
             })
-            
+
             TapPaymentTransaction.objects.update_or_create(payment=payment, defaults={
                 'tap_id': tap_id, 'tap_source_id': data.get('source', {}).get('id'),
                 'tap_card_last_4': data.get('source', {}).get('card', {}).get('last_four'),
                 'tap_card_brand': data.get('source', {}).get('card', {}).get('brand'),
                 'tap_success': tap_success, 'tap_response_code': data.get('response', {}).get('code'),
-                'tap_error_message': data.get('response', {}).get('message'), 'tap_raw_response': data
+                'tap_error_message': data.get('response', {}).get('message'), 'tap_raw_response': data,
             })
-            
-            logger.info(f"Payment created: {tap_id}")
-            return tap_success, payment, None if tap_success else data.get('response', {}).get('message')
+
+            redirect_url = (data.get('transaction') or {}).get('url')
+            if redirect_url:
+                payment.redirect_url = redirect_url
+
+            logger.info(f"Payment created: {tap_id} status={tap_status}")
+
+            if tap_success or tap_pending:
+                return True, payment, None
+            return False, payment, data.get('response', {}).get('message') or f'Status {tap_status}'
         except Exception as e:
             logger.error(f"Payment error: {str(e)}", exc_info=True)
             return False, None, str(e)
