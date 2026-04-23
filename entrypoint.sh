@@ -5,36 +5,10 @@ cd /app/hotel_booking
 
 echo "=== env diagnostic ==="
 echo "DATABASE_URL present: $([ -n "${DATABASE_URL:-}" ] && echo YES || echo NO)"
-echo "DB_HOST: ${DB_HOST:-<unset>}"
 echo "SECRET_KEY present: $([ -n "${SECRET_KEY:-}" ] && echo YES || echo NO)"
 echo "ALLOWED_HOSTS: ${ALLOWED_HOSTS:-<unset>}"
 echo "PORT: ${PORT:-<unset>}"
 echo "====================="
-
-# Prefer DATABASE_URL (Railway/Render), fall back to individual DB_* vars (compose).
-if [ -n "${DATABASE_URL:-}" ]; then
-  DB_HOST_VAL=$(python -c "from urllib.parse import urlparse; import os; print(urlparse(os.environ['DATABASE_URL']).hostname or '')")
-  DB_PORT_VAL=$(python -c "from urllib.parse import urlparse; import os; print(urlparse(os.environ['DATABASE_URL']).port or 5432)")
-  DB_USER_VAL=$(python -c "from urllib.parse import urlparse; import os; print(urlparse(os.environ['DATABASE_URL']).username or '')")
-  DB_NAME_VAL=$(python -c "from urllib.parse import urlparse; import os; print((urlparse(os.environ['DATABASE_URL']).path or '').lstrip('/') or 'postgres')")
-else
-  DB_HOST_VAL="${DB_HOST:-db}"
-  DB_PORT_VAL="${DB_PORT:-5432}"
-  DB_USER_VAL="${DB_USER:-hotelapi_user}"
-  DB_NAME_VAL="${DB_NAME:-hotelMaarDB}"
-fi
-
-wait_for_db() {
-  echo "Waiting for database at ${DB_HOST_VAL}:${DB_PORT_VAL}..."
-  for i in {1..60}; do
-    if pg_isready -h "$DB_HOST_VAL" -p "$DB_PORT_VAL" -U "$DB_USER_VAL" -d "$DB_NAME_VAL" 2>/dev/null; then
-      echo "Database available"
-      return 0
-    fi
-    sleep 1
-  done
-  echo "Database did not become ready in time — continuing anyway" >&2
-}
 
 create_superuser_if_missing() {
   if [ -z "${DJANGO_SUPERUSER_USERNAME:-}" ]; then
@@ -59,9 +33,8 @@ else:
 PY
 }
 
-# Skip heavy setup on non-web services (celery worker/beat should set RUN_SETUP=false).
+# Skip heavy setup on non-web services (set RUN_SETUP=false on celery worker/beat).
 if [ "${RUN_SETUP:-true}" = "true" ]; then
-  wait_for_db
   echo "Running migrations..."
   python manage.py migrate --noinput
   echo "Collecting static files..."
@@ -70,7 +43,7 @@ if [ "${RUN_SETUP:-true}" = "true" ]; then
   create_superuser_if_missing
 fi
 
-# If a start command is provided (celery worker, beat, custom), exec it.
+# If a start command was passed (celery worker/beat/custom), exec it.
 if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
