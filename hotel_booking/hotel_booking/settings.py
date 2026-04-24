@@ -203,10 +203,13 @@ SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=True, cast=bool)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # Used in production
 
-# WhiteNoise serves collected static files in production with compression + hashed names.
+# WhiteNoise serves collected static files in production with gzip/brotli.
+# We intentionally use CompressedStaticFilesStorage (not the Manifest variant)
+# because Jazzmin's bundled JS references a missing .map file and the manifest
+# backend aborts the whole collectstatic step on any missing reference.
 STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
-    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
 }
 
 # In development, also expose manager/static as a source dir for collectstatic
