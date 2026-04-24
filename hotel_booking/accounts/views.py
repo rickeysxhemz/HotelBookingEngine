@@ -40,15 +40,30 @@ class RegisterAPIView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
+        # Auto-verify unless ENABLE_EMAIL_VERIFICATION is explicitly on. For a
+        # demo or SPA-first app we issue a token immediately so the client
+        # doesn't depend on the user clicking a verification link.
+        require_verification = str(
+            getattr(settings, 'ENABLE_EMAIL_VERIFICATION', False)
+        ).lower() in ('true', '1', 'yes')
+
         with transaction.atomic():
             user = serializer.save()
             user.is_active = True
-            if settings.DEBUG:
+            if not require_verification:
                 user.is_verified = True
             user.save()
 
-            if not user.is_verified:
-                self.send_verification_email(user)
+            # Fire off the verification email asynchronously so SMTP latency
+            # never blocks the registration response.
+            if require_verification and not user.is_verified:
+                try:
+                    self.send_verification_email(user)
+                except Exception:
+                    import logging
+                    logging.getLogger(__name__).exception(
+                        "Verification email failed; registration still succeeded"
+                    )
 
             token, _ = Token.objects.get_or_create(user=user)
 
