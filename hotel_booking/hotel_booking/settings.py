@@ -17,7 +17,15 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=lambda v: [s.strip() for s in v.split(',')])
+def _parse_allowed_hosts(raw):
+    hosts = [h.strip() for h in (raw or '').split(',') if h.strip()]
+    # Always include Railway's edge + internal networking so healthchecks pass.
+    for default in ('.up.railway.app', '.railway.internal', 'localhost', '127.0.0.1'):
+        if default not in hosts:
+            hosts.append(default)
+    return hosts or ['*']
+
+ALLOWED_HOSTS = _parse_allowed_hosts(config('ALLOWED_HOSTS', default=''))
 
 # Application definition
 INSTALLED_APPS = [
