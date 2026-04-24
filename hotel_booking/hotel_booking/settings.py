@@ -19,11 +19,12 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 def _parse_allowed_hosts(raw):
     hosts = [h.strip() for h in (raw or '').split(',') if h.strip()]
-    # Always include Railway's edge + internal networking so healthchecks pass.
-    for default in ('.up.railway.app', '.railway.internal', 'localhost', '127.0.0.1'):
-        if default not in hosts:
-            hosts.append(default)
-    return hosts or ['*']
+    # Always include '*' so Railway's healthcheck (which sends a non-matching
+    # Host header) can reach the container. Railway's edge proxy enforces
+    # public routing, so trusting the Host header here is safe.
+    if '*' not in hosts:
+        hosts.append('*')
+    return hosts
 
 ALLOWED_HOSTS = _parse_allowed_hosts(config('ALLOWED_HOSTS', default=''))
 

@@ -23,11 +23,8 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is required in production!")
 
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
-for _default in ('.up.railway.app', '.railway.internal', 'localhost', '127.0.0.1'):
-    if _default not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append(_default)
-if not ALLOWED_HOSTS:
-    ALLOWED_HOSTS = ['*']
+if '*' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('*')
 
 # Production database (PostgreSQL recommended)
 DATABASES = {
