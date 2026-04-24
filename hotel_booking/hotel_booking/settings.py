@@ -182,6 +182,28 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
+# Railway (and most PaaS) terminate TLS at the edge and forward HTTP to the
+# container. Tell Django to trust the X-Forwarded-Proto header so request.is_secure()
+# returns True, CSRF Referer checks work, and SECURE_SSL_REDIRECT doesn't loop.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# CSRF-trusted origins for server-rendered POSTs (Django admin, etc.).
+# Values MUST include the scheme and MUST NOT have a trailing slash.
+_DEFAULT_CSRF_ORIGINS = (
+    'https://*.up.railway.app,'
+    'https://*.railway.app,'
+    'https://mar-hotels-frontend-vue-js.vercel.app,'
+    'http://localhost,'
+    'http://127.0.0.1,'
+    'http://localhost:5173,'
+    'http://127.0.0.1:5173'
+)
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default=_DEFAULT_CSRF_ORIGINS,
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
+)
+
 # Session Security
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
